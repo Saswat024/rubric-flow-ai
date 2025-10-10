@@ -1,8 +1,10 @@
-import openai
+from openai import OpenAI
 import os
 import json
+from dotenv import load_dotenv
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+load_dotenv()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 async def evaluate_flowchart(base64_image: str):
@@ -29,8 +31,8 @@ Return a JSON object with:
   "feedback": ["string array of 3-5 actionable feedback items with emojis"]
 }"""
 
-    response = openai.chat.completions.create(
-        model="gpt-4-vision-preview",  # or "gpt-4o" for newer API
+    response = client.chat.completions.create(
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": system_prompt},
             {
