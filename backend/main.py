@@ -24,18 +24,30 @@ class FlowchartRequest(BaseModel):
 
 @app.post("/api/evaluate-flowchart")
 async def api_evaluate_flowchart(request: FlowchartRequest):
+    print("\n=== FLOWCHART REQUEST RECEIVED ===")
     try:
+        print("Starting flowchart evaluation...")
         result = await evaluate_flowchart(request.image)
+        print("Evaluation successful!")
         return result
     except Exception as e:
+        print(f"\n!!! ERROR in flowchart evaluation: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/evaluate-pseudocode")
 async def api_evaluate_pseudocode(request: PseudocodeRequest):
+    print("\n=== PSEUDOCODE REQUEST RECEIVED ===")
     try:
+        print("Starting pseudocode evaluation...")
         result = await evaluate_pseudocode(request.code)
+        print("Evaluation successful!")
         return result
     except Exception as e:
+        print(f"\n!!! ERROR in pseudocode evaluation: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")

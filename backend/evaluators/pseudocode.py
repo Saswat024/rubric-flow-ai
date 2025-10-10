@@ -1,14 +1,18 @@
-from openai import OpenAI
+import google.generativeai as genai
 import os
 import json
 from dotenv import load_dotenv
 
-load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+load_dotenv(override=True)
+api_key = os.getenv("GOOGLE_API_KEY")
+print(f"Pseudocode API Key loaded: {'YES' if api_key else 'NO'}")
+if not api_key:
+    raise ValueError("GOOGLE_API_KEY not found in environment variables")
+genai.configure(api_key=api_key)
 
 
 async def evaluate_pseudocode(code: str):
-    """Evaluate pseudocode using GPT-4"""
+    """Evaluate pseudocode using gemini-pro"""
 
     system_prompt = """You are an expert pseudocode evaluator. Analyze pseudocode based on these rubrics:
 1. Correctness (50 pts): Logic is sound and achieves intended purpose
@@ -30,17 +34,9 @@ Return a JSON object with:
   "feedback": ["string array of 3-5 actionable feedback items with emojis (✅, ⚠️, 💡)"]
 }"""
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": f"Evaluate this pseudocode based on the rubrics:\n\n{code}",
-            },
-        ],
-        response_format={"type": "json_object"},
-    )
-
-    result = json.loads(response.choices[0].message.content)
+    model = genai.GenerativeModel("gemini-2.5-pro")
+    prompt = f"{system_prompt}\n\nEvaluate this pseudocode based on the rubrics:\n\n{code}"
+    response = model.generate_content(prompt)
+    print("Raw response:", response.text)
+    result = json.loads(response.text.strip().replace('```json', '').replace('```', ''))
     return result
