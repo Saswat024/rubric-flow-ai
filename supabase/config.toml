@@ -1,7 +1,0 @@
-project_id = "sqntsolofafhtjozugyy"
-
-[functions.evaluate-flowchart]
-verify_jwt = false
-
-[functions.evaluate-pseudocode]
-verify_jwt = false

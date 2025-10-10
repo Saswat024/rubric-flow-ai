@@ -25,13 +25,16 @@ export const PseudocodeEvaluator = () => {
 
     setIsEvaluating(true);
     try {
-      const response = await fetch("http://localhost:8000/api/evaluate-pseudocode", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ code }),
-      });
+      const response = await fetch(
+        "http://localhost:8000/api/evaluate-pseudocode",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ code }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -47,7 +50,8 @@ export const PseudocodeEvaluator = () => {
       console.error("Evaluation error:", error);
       toast({
         title: "Evaluation failed",
-        description: error instanceof Error ? error.message : "An error occurred",
+        description:
+          error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       });
     } finally {

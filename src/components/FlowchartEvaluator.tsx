@@ -56,13 +56,16 @@ export const FlowchartEvaluator = () => {
 
     setIsEvaluating(true);
     try {
-      const response = await fetch("http://localhost:8000/api/evaluate-flowchart", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ image: preview }),
-      });
+      const response = await fetch(
+        "http://localhost:8000/api/evaluate-flowchart",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ image: preview }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -78,7 +81,8 @@ export const FlowchartEvaluator = () => {
       console.error("Evaluation error:", error);
       toast({
         title: "Evaluation failed",
-        description: error instanceof Error ? error.message : "An error occurred",
+        description:
+          error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       });
     } finally {
