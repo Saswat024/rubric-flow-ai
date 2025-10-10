@@ -3,7 +3,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Upload, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { ResultsDisplay } from "./ResultsDisplay";
 
 export interface EvaluationResult {
@@ -57,12 +56,19 @@ export const FlowchartEvaluator = () => {
 
     setIsEvaluating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("evaluate-flowchart", {
-        body: { image: preview },
+      const response = await fetch("http://localhost:8000/api/evaluate-flowchart", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ image: preview }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
+      const data = await response.json();
       setResult(data);
       toast({
         title: "Evaluation complete",

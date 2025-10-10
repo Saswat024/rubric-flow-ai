@@ -1,14 +1,17 @@
-import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FlowchartEvaluator } from "@/components/FlowchartEvaluator";
 import { PseudocodeEvaluator } from "@/components/PseudocodeEvaluator";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { FileCode2, Workflow } from "lucide-react";
 
 const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <div className="container mx-auto px-4 py-8">
-        <header className="mb-8 text-center">
+        <header className="mb-8 text-center relative">
+          <div className="absolute right-0 top-0">
+            <ThemeToggle />
+          </div>
           <h1 className="mb-3 text-4xl font-bold text-primary md:text-5xl">
             Intelligent Rubrics-Based Evaluator
           </h1>

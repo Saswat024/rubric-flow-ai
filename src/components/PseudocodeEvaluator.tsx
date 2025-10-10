@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { ResultsDisplay } from "./ResultsDisplay";
 import { EvaluationResult } from "./FlowchartEvaluator";
 
@@ -26,12 +25,19 @@ export const PseudocodeEvaluator = () => {
 
     setIsEvaluating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("evaluate-pseudocode", {
-        body: { code },
+      const response = await fetch("http://localhost:8000/api/evaluate-pseudocode", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
+      const data = await response.json();
       setResult(data);
       toast({
         title: "Evaluation complete",
