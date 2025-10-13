@@ -17,40 +17,104 @@ genai.configure(api_key=api_key)
 async def evaluate_flowchart(base64_image: str):
     """Evaluate flowchart using gemini-2.5-flash-lite with image input"""
 
-    system_prompt = """You are an expert flowchart evaluator.Analyze the uploaded flowchart image and evaluate it according to the following rubrics:
-1. Start/End Presence (10 pts) – The flowchart includes clearly defined start and end terminal nodes in the correct shapes (rounded rectangles or ovals).
-2. Decision Nodes (30 pts) – Decision points use diamond shapes correctly and contain clear, labeled branches (e.g., “Yes” / “No”).
-3. Completeness (30 pts) – The flowchart captures all major steps of the intended process or algorithm without missing links or logic gaps.
-4. Flow Direction (20 pts) – The flow proceeds logically and consistently (preferably top-to-bottom or left-to-right) with properly connected arrows.
-5. Label Clarity (10 pts) – All shapes and connections have legible, descriptive text for easy understanding.
+    system_prompt = """You are an expert flowchart evaluator with extensive knowledge of process modeling, algorithmic representation, and standard flowchart conventions (ISO 5807 and related standards). Your task is to analyze the uploaded flowchart image and provide a comprehensive, objective evaluation.
+Evaluation Criteria
+Assess the flowchart using these weighted rubrics (total: 100 points):
 
-Output Format
+1. Start/End Presence (10 points):
+Does the flowchart have a clearly marked start node?
+Does it have a clearly marked end node (or multiple end nodes if appropriate)?
+Are start/end nodes in the correct shape (rounded rectangles/ovals/stadium shapes)?
+Are they labeled appropriately (e.g., "Start", "Begin", "End", "Stop")?
+
+2. Decision Nodes (30 points):
+Are all decision points represented using diamond shapes?
+Does each decision contain a clear question or condition?
+Are all branches properly labeled (e.g., "Yes/No", "True/False", specific conditions)?
+Do decision diamonds have exactly two or more exit paths?
+Are the branch labels positioned clearly near the arrows?
+
+3. Completeness (30 points):
+Does the flowchart capture all essential steps of the process or algorithm?
+Are there any logical gaps or missing connections between steps?
+Does every process lead to a subsequent action or termination?
+Are there any dead ends or orphaned nodes without connections?
+Does the logic flow cover all possible paths from start to end?
+
+4. Flow Direction (20 points):
+Does the flow follow a consistent direction (top-to-bottom or left-to-right preferred)?
+Are arrows clearly drawn and pointing in the correct direction?
+Are all shapes properly connected (no floating nodes)?
+Does the visual layout avoid crossing lines where possible?
+Is the flow easy to trace visually from start to end?
+
+5. Label Clarity (10 points):
+Is all text legible and appropriately sized?
+Are process descriptions clear and concise?
+Do labels use consistent terminology and style?
+Are standard flowchart symbols used correctly (rectangles for processes, parallelograms for input/output, etc.)?
+
+Required Output Format:-
+Return your evaluation exclusively as a valid JSON object. Do not include any text, explanations, or markdown formatting outside the JSON structure:
+
+Output Format:-
 Return only a valid JSON object (no additional explanation or commentary) in this exact structure:
 {
-  "total_score": <number between 0 and 100>,
+  "total_score": <integer 0-100>,
   "breakdown": [
     {
-      "criterion": "<string>",
-      "score": <number>,
-      "max_score": <number>,
-      "feedback": "<short justification or comment>"
+      "criterion": "Start/End Presence",
+      "score": <integer 0-10>,
+      "max_score": 10,
+      "feedback": "<specific observations about start/end nodes in the image>"
+    },
+    {
+      "criterion": "Decision Nodes",
+      "score": <integer 0-30>,
+      "max_score": 30,
+      "feedback": "<specific observations about decision diamonds and branches>"
+    },
+    {
+      "criterion": "Completeness",
+      "score": <integer 0-30>,
+      "max_score": 30,
+      "feedback": "<specific observations about logic gaps or missing steps>"
+    },
+    {
+      "criterion": "Flow Direction",
+      "score": <integer 0-20>,
+      "max_score": 20,
+      "feedback": "<specific observations about arrow directions and layout>"
+    },
+    {
+      "criterion": "Label Clarity",
+      "score": <integer 0-10>,
+      "max_score": 10,
+      "feedback": "<specific observations about text readability and symbol usage>"
     }
   ],
   "feedback": [
-    "<3–5 concise, actionable feedback items with emojis (✅ strengths, ⚠️ issues, 💡 suggestions)>"
+    "<3-5 actionable feedback items as separate strings>"
   ]
 }
-Evaluation Guidelines
 
--> Base your assessment solely on the visual content of the flowchart image.
--> Assign scores objectively according to how well each rubric is visually represented.
--> Provide specific reasons for each rubric score in breakdown.feedback.
--> Include 3–5 clear, actionable feedback points in the main feedback array.
+Evaluation Guidelines:
+Analyze the actual image carefully: Base all assessments on what you can visually observe in the uploaded flowchart
+Be specific: Reference particular elements you can see (e.g., "the decision node at the top", "missing label on the right branch")
+Be objective: Score based on standard flowchart conventions, not subjective preferences
+Be actionable: Provide concrete suggestions that would improve the flowchart
+
 Use emojis consistently:
+✅ Correct implementations or strong elements present in the flowchart
+⚠️ Errors, missing elements, or convention violations
+💡 Suggestions for improvements or enhancements
 
-✅ for correct or strong elements
-⚠️ for errors or missing elements
-💡 for suggested improvements
+Important Notes:
+If the image quality is poor or elements are unclear, note this in your feedback but still provide your best assessment
+Consider the context: a simple process may naturally have fewer decision nodes than a complex algorithm
+Ensure your JSON is valid with proper escaping of special characters in text fields
+
+Critical: Return ONLY the JSON object with no surrounding text, markdown code blocks, or explanatory comments.
 """
 
     # Decode base64 image

@@ -14,37 +14,80 @@ genai.configure(api_key=api_key)
 async def evaluate_pseudocode(code: str):
     """Evaluate pseudocode using gemini-2.5-flash-lite"""
 
-    system_prompt = """You are an expert pseudocode evaluator. Evaluate the given pseudocode according to the following rubrics:
-1. Correctness (50 pts) – The pseudocode’s logic is sound, complete, and correctly implements the intended task or algorithm.
-2. Edge Case Handling (20 pts) – The pseudocode considers special or boundary cases (e.g., empty inputs, invalid data, zero values, etc.) and prevents runtime or logical errors
-3. Clarity (15 pts) – The pseudocode uses meaningful variable names, clear control structures, and consistent indentation; overall readability is high.
-4. Complexity (15 pts) – The algorithm demonstrates efficiency and appropriate time/space complexity for the problem; avoids unnecessary operations.
+    system_prompt = """You are an expert pseudocode evaluator with deep knowledge of algorithms, data structures, and software engineering best practices. Your task is to rigorously evaluate the provided pseudocode against specific criteria and return a structured assessment.:
+Evaluation Criteria:-
+Assess the pseudocode using these weighted rubrics (total: 100 points):
+1. Correctness (50 points):
+Does the logic accurately implement the intended algorithm or task?
+Are all steps logically sound and in the correct sequence?
+Would this pseudocode translate into working code without logical errors?
+Are variable assignments, conditions, and operations correct?
 
-Output Format
-Return the evaluation strictly as a JSON object with the following structure:
+2. Edge Case Handling (20 points):
+Does it account for boundary conditions (empty inputs, single elements, maximum values)?
+Does it validate inputs and handle invalid/unexpected data gracefully?
+Are special cases like zero, null, negative values, or duplicates addressed?
+Does it prevent potential runtime errors (division by zero, array out of bounds, etc.)?
+
+3. Clarity (15 points):
+Are variable and function names descriptive and meaningful?
+Is the structure easy to follow with proper indentation and formatting?
+Are control flow statements (if/else, loops) clearly organized?
+Is the overall logic readable by someone unfamiliar with the code?
+
+4. Complexity (15 points):
+Is the time complexity appropriate for the problem?
+Is the space complexity optimized or reasonable?
+Are there unnecessary redundant operations or inefficient patterns?
+Could the algorithm be simplified without sacrificing correctness?
+
+Required Output Format
+Return your evaluation exclusively as a valid JSON object with no additional text, markdown formatting, or explanation outside the JSON structure:
 {
-  "total_score": <number between 0 and 100>,
+  "total_score": <integer 0-100>,
   "breakdown": [
     {
-      "criterion": "<string>",
-      "score": <number>,
-      "max_score": <number>,
-      "feedback": "<string>"
+      "criterion": "Correctness",
+      "score": <integer 0-50>,
+      "max_score": 50,
+      "feedback": "<specific explanation with examples from the pseudocode>"
+    },
+    {
+      "criterion": "Edge Case Handling",
+      "score": <integer 0-20>,
+      "max_score": 20,
+      "feedback": "<specific explanation with examples>"
+    },
+    {
+      "criterion": "Clarity",
+      "score": <integer 0-15>,
+      "max_score": 15,
+      "feedback": "<specific explanation with examples>"
+    },
+    {
+      "criterion": "Complexity",
+      "score": <integer 0-15>,
+      "max_score": 15,
+      "feedback": "<specific explanation with time/space complexity analysis>"
     }
   ],
   "feedback": [
-    "<string array of 3-5 actionable feedback items with emojis (✅, ⚠️, 💡)>"
+    "<3-5 actionable feedback items as separate strings>"
   ]
 }
-Additional Guidelines
+Evaluation Guidelines
 
--> Be objective and concise in scoring.
--> Include specific reasons for each criterion’s score.
--> In the feedback array, provide actionable suggestions for improvement (not just restating issues).
-Use the emojis as follows:
-✅ for strengths
-⚠️ for issues or weaknesses
-💡 for suggestions or enhancements
+Be specific: Reference actual lines or patterns from the pseudocode in your feedback
+Be objective: Base scores on observable qualities, not assumptions
+Be actionable: In the feedback array, provide concrete suggestions for improvement
+Use emojis consistently:
+
+✅ Strengths or correct implementations
+⚠️ Issues, errors, or weaknesses that need attention
+💡 Suggestions for enhancements or optimizations
+
+
+Important: Return ONLY the JSON object. Do not include any text before or after the JSON, no markdown code blocks, and no explanatory prose.
 """
 
     model = genai.GenerativeModel("gemini-2.5-flash-lite")

@@ -24,6 +24,77 @@ class PseudocodeRequest(BaseModel):
 class FlowchartRequest(BaseModel):
     image: str  # base64 encoded image
 
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+# Dependency to get current user from token
+async def get_current_user(authorization: Optional[str] = Header(None)) -> int:
+    print(f"Authorization header: {authorization}")
+    
+    if not authorization:
+        print("No authorization header provided")
+        raise HTTPException(status_code=401, detail="Authorization header missing")
+    
+    if not authorization.startswith("Bearer "):
+        print(f"Invalid authorization format: {authorization}")
+        raise HTTPException(status_code=401, detail="Invalid authorization format")
+    
+    token = authorization.replace("Bearer ", "")
+    print(f"Extracted token: {token[:10]}...")
+    
+    user_id = verify_session(token)
+    print(f"User ID from token: {user_id}")
+    
+    if not user_id:
+        print("Token verification failed")
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    return user_id
+
+@app.post("/api/auth/signup")
+async def signup(request: SignupRequest):
+    success, message = create_user(request.email, request.password)
+    
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    
+    return {"message": message}
+
+@app.post("/api/auth/login")
+async def login(request: LoginRequest):
+    user_id = verify_user(request.email, request.password)
+    
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    token = create_session(user_id)
+    email = get_user_email(user_id)
+    
+    return {"token": token, "email": email}
+
+@app.post("/api/auth/logout")
+async def logout(authorization: Optional[str] = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    token = authorization.replace("Bearer ", "")
+    success = delete_session(token)
+    
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to logout")
+    
+    return {"message": "Logged out successfully"}
+
+@app.get("/api/auth/me")
+async def get_me(user_id: int = Depends(get_current_user)):
+    email = get_user_email(user_id)
+    return {"email": email, "user_id": user_id}
+
 @app.post("/api/evaluate-flowchart")
 async def api_evaluate_flowchart(request: FlowchartRequest, user_id: int = Depends(get_current_user)):
     print("\n=== FLOWCHART REQUEST RECEIVED ===")
