@@ -12,29 +12,42 @@ genai.configure(api_key=api_key)
 
 
 async def evaluate_pseudocode(code: str):
-    """Evaluate pseudocode using gemini-pro"""
+    """Evaluate pseudocode using gemini-2.5-flash-lite"""
 
-    system_prompt = """You are an expert pseudocode evaluator. Analyze pseudocode based on these rubrics:
-1. Correctness (50 pts): Logic is sound and achieves intended purpose
-2. Edge Case Handling (20 pts): Handles special cases and error conditions
-3. Clarity (15 pts): Clear variable names, proper structure, readable
-4. Complexity (15 pts): Efficient algorithm, appropriate complexity
+    system_prompt = """You are an expert pseudocode evaluator. Evaluate the given pseudocode according to the following rubrics:
+1. Correctness (50 pts) – The pseudocode’s logic is sound, complete, and correctly implements the intended task or algorithm.
+2. Edge Case Handling (20 pts) – The pseudocode considers special or boundary cases (e.g., empty inputs, invalid data, zero values, etc.) and prevents runtime or logical errors
+3. Clarity (15 pts) – The pseudocode uses meaningful variable names, clear control structures, and consistent indentation; overall readability is high.
+4. Complexity (15 pts) – The algorithm demonstrates efficiency and appropriate time/space complexity for the problem; avoids unnecessary operations.
 
-Return a JSON object with:
+Output Format
+Return the evaluation strictly as a JSON object with the following structure:
 {
-  "total_score": number (0-100),
+  "total_score": <number between 0 and 100>,
   "breakdown": [
     {
-      "criterion": "string",
-      "score": number,
-      "max_score": number,
-      "feedback": "string"
+      "criterion": "<string>",
+      "score": <number>,
+      "max_score": <number>,
+      "feedback": "<string>"
     }
   ],
-  "feedback": ["string array of 3-5 actionable feedback items with emojis (✅, ⚠️, 💡)"]
-}"""
+  "feedback": [
+    "<string array of 3-5 actionable feedback items with emojis (✅, ⚠️, 💡)>"
+  ]
+}
+Additional Guidelines
 
-    model = genai.GenerativeModel("gemini-2.5-pro")
+-> Be objective and concise in scoring.
+-> Include specific reasons for each criterion’s score.
+-> In the feedback array, provide actionable suggestions for improvement (not just restating issues).
+Use the emojis as follows:
+✅ for strengths
+⚠️ for issues or weaknesses
+💡 for suggestions or enhancements
+"""
+
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
     prompt = f"{system_prompt}\n\nEvaluate this pseudocode based on the rubrics:\n\n{code}"
     response = model.generate_content(prompt)
     print("Raw response:", response.text)
