@@ -100,7 +100,7 @@ export const EvaluationHistory = () => {
             {evaluations.map((evaluation) => (
               <div
                 key={evaluation.id}
-                className="flex items-start gap-3 p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                className="flex items-start gap-3 p-4 rounded-lg border bg-card hover:shadow-md hover:border-primary/20 transition-all duration-200"
               >
                 <div className="mt-1">
                   {evaluation.type === 'flowchart' ? (
