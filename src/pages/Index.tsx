@@ -1,15 +1,42 @@
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { FlowchartEvaluator } from "@/components/FlowchartEvaluator";
 import { PseudocodeEvaluator } from "@/components/PseudocodeEvaluator";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { FileCode2, Workflow } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { FileCode2, Workflow, LogOut } from "lucide-react";
 
 const Index = () => {
+  const { token, email, logout } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!token) {
+      navigate('/auth');
+    }
+  }, [token, navigate]);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/auth');
+  };
+
+  if (!token) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <div className="container mx-auto px-4 py-8">
         <header className="mb-8 text-center relative">
-          <div className="absolute right-0 top-0">
+          <div className="absolute right-0 top-0 flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">{email}</span>
+            <Button variant="outline" size="sm" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
             <ThemeToggle />
           </div>
           <h1 className="mb-3 text-4xl font-bold text-primary md:text-5xl">

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Upload, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ResultsDisplay } from "./ResultsDisplay";
+import { evaluateFlowchart } from "@/lib/api";
 
 export interface EvaluationResult {
   total_score: number;
@@ -56,22 +57,7 @@ export const FlowchartEvaluator = () => {
 
     setIsEvaluating(true);
     try {
-      const response = await fetch(
-        "http://localhost:8000/api/evaluate-flowchart",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ image: preview }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await evaluateFlowchart(preview);
       setResult(data);
       toast({
         title: "Evaluation complete",

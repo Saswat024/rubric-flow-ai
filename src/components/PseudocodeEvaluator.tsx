@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ResultsDisplay } from "./ResultsDisplay";
 import { EvaluationResult } from "./FlowchartEvaluator";
+import { evaluatePseudocode } from "@/lib/api";
 
 export const PseudocodeEvaluator = () => {
   const [code, setCode] = useState("");
@@ -25,22 +26,7 @@ export const PseudocodeEvaluator = () => {
 
     setIsEvaluating(true);
     try {
-      const response = await fetch(
-        "http://localhost:8000/api/evaluate-pseudocode",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ code }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await evaluatePseudocode(code);
       setResult(data);
       toast({
         title: "Evaluation complete",
