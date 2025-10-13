@@ -33,6 +33,20 @@ def init_database():
         )
     """)
     
+    # Create evaluations table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS evaluations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            content TEXT,
+            result TEXT NOT NULL,
+            total_score INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    """)
+    
     conn.commit()
     conn.close()
 
@@ -133,6 +147,50 @@ def get_user_email(user_id: int) -> Optional[str]:
     conn.close()
     
     return result[0] if result else None
+
+def save_evaluation(user_id: int, eval_type: str, content: str, result: dict) -> int:
+    """Save an evaluation result. Returns evaluation_id"""
+    import json
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        "INSERT INTO evaluations (user_id, type, content, result, total_score) VALUES (?, ?, ?, ?, ?)",
+        (user_id, eval_type, content, json.dumps(result), result.get('total_score', 0))
+    )
+    
+    eval_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    
+    return eval_id
+
+def get_user_evaluations(user_id: int, limit: int = 10):
+    """Get recent evaluations for a user"""
+    import json
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        "SELECT id, type, content, result, total_score, created_at FROM evaluations WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+        (user_id, limit)
+    )
+    
+    results = cursor.fetchall()
+    conn.close()
+    
+    evaluations = []
+    for row in results:
+        evaluations.append({
+            'id': row[0],
+            'type': row[1],
+            'content': row[2],
+            'result': json.loads(row[3]),
+            'total_score': row[4],
+            'created_at': row[5]
+        })
+    
+    return evaluations
 
 # Initialize database on module import
 init_database()

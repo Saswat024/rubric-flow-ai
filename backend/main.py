@@ -5,7 +5,10 @@ from typing import Optional
 import base64
 from evaluators.flowchart import evaluate_flowchart
 from evaluators.pseudocode import evaluate_pseudocode
-from database import create_user, verify_user, create_session, verify_session, delete_session, get_user_email
+from database import (
+    create_user, verify_user, create_session, verify_session, 
+    delete_session, get_user_email, save_evaluation, get_user_evaluations
+)
 
 app = FastAPI()
 
@@ -103,6 +106,8 @@ async def api_evaluate_flowchart(request: FlowchartRequest, user_id: int = Depen
         print("Starting flowchart evaluation...")
         result = await evaluate_flowchart(request.image)
         print("Evaluation successful!")
+        # Save evaluation to database
+        save_evaluation(user_id, 'flowchart', 'image_data', result)
         return result
     except Exception as e:
         print(f"\n!!! ERROR in flowchart evaluation: {str(e)}")
@@ -118,11 +123,23 @@ async def api_evaluate_pseudocode(request: PseudocodeRequest, user_id: int = Dep
         print("Starting pseudocode evaluation...")
         result = await evaluate_pseudocode(request.code)
         print("Evaluation successful!")
+        # Save evaluation to database
+        save_evaluation(user_id, 'pseudocode', request.code[:500], result)
         return result
     except Exception as e:
         print(f"\n!!! ERROR in pseudocode evaluation: {str(e)}")
         import traceback
         traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/evaluations")
+async def api_get_evaluations(user_id: int = Depends(get_current_user)):
+    """Get user's evaluation history"""
+    try:
+        evaluations = get_user_evaluations(user_id)
+        return evaluations
+    except Exception as e:
+        print(f"Error fetching evaluations: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
