@@ -1,9 +1,17 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
+function getAuthHeaders() {
+  const token = localStorage.getItem('token');
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { "Authorization": `Bearer ${token}` } : {})
+  };
+}
+
 export async function evaluateFlowchart(imageBase64: string) {
   const response = await fetch(`${API_BASE_URL}/api/evaluate-flowchart`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ image: imageBase64 }),
   });
 
@@ -17,7 +25,7 @@ export async function evaluateFlowchart(imageBase64: string) {
 export async function evaluatePseudocode(code: string) {
   const response = await fetch(`${API_BASE_URL}/api/evaluate-pseudocode`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ code }),
   });
 

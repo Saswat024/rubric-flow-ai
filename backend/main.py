@@ -1,9 +1,11 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 import base64
 from evaluators.flowchart import evaluate_flowchart
 from evaluators.pseudocode import evaluate_pseudocode
+from database import create_user, verify_user, create_session, verify_session, delete_session, get_user_email
 
 app = FastAPI()
 
@@ -22,10 +24,71 @@ class PseudocodeRequest(BaseModel):
 class FlowchartRequest(BaseModel):
     image: str  # base64 encoded image
 
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+# Dependency to get current user from token
+async def get_current_user(authorization: Optional[str] = Header(None)) -> int:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    token = authorization.replace("Bearer ", "")
+    user_id = verify_session(token)
+    
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    return user_id
+
+@app.post("/api/auth/signup")
+async def signup(request: SignupRequest):
+    success, message = create_user(request.email, request.password)
+    
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    
+    return {"message": message}
+
+@app.post("/api/auth/login")
+async def login(request: LoginRequest):
+    user_id = verify_user(request.email, request.password)
+    
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    token = create_session(user_id)
+    email = get_user_email(user_id)
+    
+    return {"token": token, "email": email}
+
+@app.post("/api/auth/logout")
+async def logout(authorization: Optional[str] = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    token = authorization.replace("Bearer ", "")
+    success = delete_session(token)
+    
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to logout")
+    
+    return {"message": "Logged out successfully"}
+
+@app.get("/api/auth/me")
+async def get_me(user_id: int = Depends(get_current_user)):
+    email = get_user_email(user_id)
+    return {"email": email, "user_id": user_id}
+
 @app.post("/api/evaluate-flowchart")
-async def api_evaluate_flowchart(request: FlowchartRequest):
+async def api_evaluate_flowchart(request: FlowchartRequest, user_id: int = Depends(get_current_user)):
     print("\n=== FLOWCHART REQUEST RECEIVED ===")
     try:
+        print(f"User ID: {user_id}")
         print("Starting flowchart evaluation...")
         result = await evaluate_flowchart(request.image)
         print("Evaluation successful!")
@@ -37,9 +100,10 @@ async def api_evaluate_flowchart(request: FlowchartRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/evaluate-pseudocode")
-async def api_evaluate_pseudocode(request: PseudocodeRequest):
+async def api_evaluate_pseudocode(request: PseudocodeRequest, user_id: int = Depends(get_current_user)):
     print("\n=== PSEUDOCODE REQUEST RECEIVED ===")
     try:
+        print(f"User ID: {user_id}")
         print("Starting pseudocode evaluation...")
         result = await evaluate_pseudocode(request.code)
         print("Evaluation successful!")
