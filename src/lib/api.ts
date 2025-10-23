@@ -57,3 +57,78 @@ export async function evaluatePseudocode(code: string) {
 
   return response.json();
 }
+
+export async function evaluateDocument(fileBase64: string, fileType: string) {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('Not authenticated. Please log in.');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/evaluate-document`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ file: fileBase64, file_type: fileType }),
+  });
+
+  if (response.status === 401) {
+    localStorage.removeItem('token');
+    throw new Error('Session expired. Please log in again.');
+  }
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Evaluation failed: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function exportEvaluationPDF(evaluationId: number): Promise<Blob> {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('Not authenticated. Please log in.');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/export/pdf/${evaluationId}`, {
+    method: "GET",
+    headers: {
+      "Authorization": `Bearer ${token}`
+    },
+  });
+
+  if (response.status === 401) {
+    localStorage.removeItem('token');
+    throw new Error('Session expired. Please log in again.');
+  }
+
+  if (!response.ok) {
+    throw new Error(`Export failed: ${response.statusText}`);
+  }
+
+  return response.blob();
+}
+
+export async function exportEvaluationsCSV(): Promise<string> {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('Not authenticated. Please log in.');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/export/csv`, {
+    method: "GET",
+    headers: {
+      "Authorization": `Bearer ${token}`
+    },
+  });
+
+  if (response.status === 401) {
+    localStorage.removeItem('token');
+    throw new Error('Session expired. Please log in again.');
+  }
+
+  if (!response.ok) {
+    throw new Error(`Export failed: ${response.statusText}`);
+  }
+
+  return response.text();
+}

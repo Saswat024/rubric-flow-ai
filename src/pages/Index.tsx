@@ -4,10 +4,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { FlowchartEvaluator } from "@/components/FlowchartEvaluator";
 import { PseudocodeEvaluator } from "@/components/PseudocodeEvaluator";
+import { DocumentEvaluator } from "@/components/DocumentEvaluator";
 import { EvaluationHistory } from "@/components/EvaluationHistory";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileCode2, Workflow, LogOut } from "lucide-react";
+import { FileCode2, Workflow, LogOut, FileText } from "lucide-react";
 
 const Index = () => {
   const { token, email, logout } = useAuth();
@@ -55,14 +56,18 @@ const Index = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mx-auto max-w-7xl">
           <div className="lg:col-span-2">
             <Tabs defaultValue="flowchart" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsList className="grid w-full grid-cols-3 mb-6">
                 <TabsTrigger value="flowchart" className="gap-2">
                   <Workflow className="h-4 w-4" />
-                  Flowchart Evaluator
+                  Flowchart
                 </TabsTrigger>
                 <TabsTrigger value="pseudocode" className="gap-2">
                   <FileCode2 className="h-4 w-4" />
-                  Pseudocode Evaluator
+                  Pseudocode
+                </TabsTrigger>
+                <TabsTrigger value="document" className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Document
                 </TabsTrigger>
               </TabsList>
 
@@ -72,6 +77,10 @@ const Index = () => {
 
               <TabsContent value="pseudocode">
                 <PseudocodeEvaluator />
+              </TabsContent>
+
+              <TabsContent value="document">
+                <DocumentEvaluator />
               </TabsContent>
             </Tabs>
           </div>

@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { History, FileCode2, Workflow } from "lucide-react";
+import { History, FileCode2, Workflow, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ExportButton } from "./ExportButton";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -85,9 +86,12 @@ export const EvaluationHistory = () => {
 
   return (
     <Card className="p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <History className="h-5 w-5" />
-        <h2 className="text-xl font-semibold">Evaluation History</h2>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <History className="h-5 w-5" />
+          <h2 className="text-xl font-semibold">Evaluation History</h2>
+        </div>
+        {evaluations.length > 0 && <ExportButton type="multiple" />}
       </div>
 
       {evaluations.length === 0 ? (
@@ -105,6 +109,8 @@ export const EvaluationHistory = () => {
                 <div className="mt-1">
                   {evaluation.type === 'flowchart' ? (
                     <Workflow className="h-5 w-5 text-primary" />
+                  ) : evaluation.type === 'document' ? (
+                    <FileText className="h-5 w-5 text-primary" />
                   ) : (
                     <FileCode2 className="h-5 w-5 text-primary" />
                   )}
@@ -120,10 +126,11 @@ export const EvaluationHistory = () => {
                     </span>
                   </div>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between gap-2">
                     <Badge className={getScoreColor(evaluation.total_score)}>
                       Score: {evaluation.total_score}/100
                     </Badge>
+                    <ExportButton evaluationId={evaluation.id} type="single" />
                   </div>
                 </div>
               </div>
