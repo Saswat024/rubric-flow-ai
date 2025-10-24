@@ -4,6 +4,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import Optional
 import base64
+import json
 from evaluators.flowchart import evaluate_flowchart
 from evaluators.pseudocode import evaluate_pseudocode
 from evaluators.algorithm import evaluate_algorithm
@@ -65,24 +66,16 @@ class ComparisonRequest(BaseModel):
 
 # Dependency to get current user from token
 async def get_current_user(authorization: Optional[str] = Header(None)) -> int:
-    print(f"Authorization header: {authorization}")
-    
     if not authorization:
-        print("No authorization header provided")
         raise HTTPException(status_code=401, detail="Authorization header missing")
     
     if not authorization.startswith("Bearer "):
-        print(f"Invalid authorization format: {authorization}")
         raise HTTPException(status_code=401, detail="Invalid authorization format")
     
     token = authorization.replace("Bearer ", "")
-    print(f"Extracted token: {token[:10]}...")
-    
     user_id = verify_session(token)
-    print(f"User ID from token: {user_id}")
     
     if not user_id:
-        print("Token verification failed")
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     
     return user_id
