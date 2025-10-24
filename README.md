@@ -61,18 +61,7 @@ cp .env.example .env
 python start.py
 ```
 
-### Docker Deployment
-```bash
-# Backend Docker build
-cd backend
-docker build -t rubric-flow-backend .
-docker run -p 8000:8000 rubric-flow-backend
-```
 
-### Railway Deployment
-The project includes Railway configuration files for easy deployment:
-- Frontend: Automatically builds and serves the React app
-- Backend: Deploys FastAPI with health checks
 
 ## API Endpoints
 
