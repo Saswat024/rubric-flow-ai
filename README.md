@@ -52,27 +52,10 @@ npm run dev
 ```bash
 cd backend
 pip install -r requirements.txt
-
-# Copy and configure environment variables
-cp .env.example .env
-# Edit .env and add your Google API key:
-# GOOGLE_API_KEY=your_google_api_key_here
-
 python start.py
 ```
 
-### Docker Deployment
-```bash
-# Backend Docker build
-cd backend
-docker build -t rubric-flow-backend .
-docker run -p 8000:8000 rubric-flow-backend
-```
 
-### Railway Deployment
-The project includes Railway configuration files for easy deployment:
-- Frontend: Automatically builds and serves the React app
-- Backend: Deploys FastAPI with health checks
 
 ## API Endpoints
 
