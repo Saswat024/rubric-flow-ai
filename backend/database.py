@@ -7,7 +7,7 @@ from typing import Optional, Tuple
 DB_FILE = "users.db"
 
 def init_database():
-    """Initialize the SQLite database with users and sessions tables"""
+    """Initialize the SQLite database with users, sessions, evaluations, and comparisons tables"""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
@@ -42,6 +42,26 @@ def init_database():
             content TEXT,
             result TEXT NOT NULL,
             total_score INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    """)
+    
+    # Create comparisons table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS comparisons (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            problem_statement TEXT NOT NULL,
+            solution1_type TEXT NOT NULL,
+            solution1_content TEXT NOT NULL,
+            solution2_type TEXT NOT NULL,
+            solution2_content TEXT NOT NULL,
+            cfg1_json TEXT NOT NULL,
+            cfg2_json TEXT NOT NULL,
+            comparison_result TEXT NOT NULL,
+            winner TEXT NOT NULL,
+            overall_scores TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
@@ -191,6 +211,97 @@ def get_user_evaluations(user_id: int, limit: int = 10):
         })
     
     return evaluations
+
+def save_comparison(user_id: int, problem_statement: str, solution1_type: str, solution1_content: str,
+                   solution2_type: str, solution2_content: str, cfg1_json: str, cfg2_json: str,
+                   comparison_result: dict, winner: str, overall_scores: dict) -> int:
+    """Save a solution comparison. Returns comparison_id"""
+    import json
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        """INSERT INTO comparisons (user_id, problem_statement, solution1_type, solution1_content,
+           solution2_type, solution2_content, cfg1_json, cfg2_json, comparison_result, winner, overall_scores)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (user_id, problem_statement, solution1_type, solution1_content[:1000],
+         solution2_type, solution2_content[:1000], cfg1_json, cfg2_json,
+         json.dumps(comparison_result), winner, json.dumps(overall_scores))
+    )
+    
+    comp_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    
+    return comp_id
+
+
+def get_user_comparisons(user_id: int, limit: int = 20):
+    """Get recent comparisons for a user"""
+    import json
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        """SELECT id, problem_statement, solution1_type, solution2_type, winner, 
+           overall_scores, comparison_result, created_at 
+           FROM comparisons WHERE user_id = ? ORDER BY created_at DESC LIMIT ?""",
+        (user_id, limit)
+    )
+    
+    results = cursor.fetchall()
+    conn.close()
+    
+    comparisons = []
+    for row in results:
+        comparisons.append({
+            'id': row[0],
+            'problem_statement': row[1],
+            'solution1_type': row[2],
+            'solution2_type': row[3],
+            'winner': row[4],
+            'overall_scores': json.loads(row[5]),
+            'comparison_result': json.loads(row[6]),
+            'created_at': row[7]
+        })
+    
+    return comparisons
+
+
+def get_comparison_by_id(comparison_id: int, user_id: int):
+    """Get a specific comparison by ID"""
+    import json
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        """SELECT id, problem_statement, solution1_type, solution1_content, solution2_type, 
+           solution2_content, cfg1_json, cfg2_json, comparison_result, winner, overall_scores, created_at
+           FROM comparisons WHERE id = ? AND user_id = ?""",
+        (comparison_id, user_id)
+    )
+    
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row:
+        return None
+    
+    return {
+        'id': row[0],
+        'problem_statement': row[1],
+        'solution1_type': row[2],
+        'solution1_content': row[3],
+        'solution2_type': row[4],
+        'solution2_content': row[5],
+        'cfg1_json': json.loads(row[6]),
+        'cfg2_json': json.loads(row[7]),
+        'comparison_result': json.loads(row[8]),
+        'winner': row[9],
+        'overall_scores': json.loads(row[10]),
+        'created_at': row[11]
+    }
+
 
 # Initialize database on module import
 init_database()

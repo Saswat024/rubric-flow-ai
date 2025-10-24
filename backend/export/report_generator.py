@@ -187,3 +187,117 @@ def generate_csv_report(evaluations: List[Dict[str, Any]]) -> str:
     output.close()
     
     return csv_content
+
+
+def generate_comparison_pdf_report(comparison: dict, user_email: str) -> bytes:
+    """Generate a PDF report for solution comparison"""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    story = []
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.HexColor('#1e40af'),
+        spaceAfter=30,
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=16,
+        textColor=colors.HexColor('#374151'),
+        spaceAfter=12,
+    )
+    
+    # Title
+    story.append(Paragraph("Solution Comparison Report", title_style))
+    story.append(Paragraph(f"User: {user_email}", styles['Normal']))
+    story.append(Paragraph(f"Date: {comparison['created_at']}", styles['Normal']))
+    story.append(Spacer(1, 0.3*inch))
+    
+    # Problem Statement
+    story.append(Paragraph("Problem Statement", heading_style))
+    story.append(Paragraph(comparison['problem_statement'], styles['BodyText']))
+    story.append(Spacer(1, 0.2*inch))
+    
+    # Winner Section
+    story.append(Paragraph("Winner", heading_style))
+    winner_text = f"<b>{comparison['winner'].upper()}</b>"
+    story.append(Paragraph(winner_text, styles['BodyText']))
+    story.append(Spacer(1, 0.2*inch))
+    
+    # Overall Scores
+    story.append(Paragraph("Overall Scores", heading_style))
+    scores_data = [
+        ['Solution', 'Score'],
+        ['Solution 1', str(comparison['overall_scores']['solution1'])],
+        ['Solution 2', str(comparison['overall_scores']['solution2'])]
+    ]
+    scores_table = Table(scores_data, colWidths=[3*inch, 2*inch])
+    scores_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3b82f6')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(scores_table)
+    story.append(Spacer(1, 0.3*inch))
+    
+    # Comparison Breakdown
+    story.append(Paragraph("Detailed Comparison", heading_style))
+    comparison_result = comparison['comparison_result']
+    
+    for criterion, data in comparison_result['comparison'].items():
+        story.append(Paragraph(f"<b>{criterion.title()}</b>", styles['Heading3']))
+        
+        comp_data = [
+            ['Solution', 'Score', 'Feedback'],
+            ['Solution 1', str(data['solution1']['score']), data['solution1']['feedback']],
+            ['Solution 2', str(data['solution2']['score']), data['solution2']['feedback']]
+        ]
+        
+        comp_table = Table(comp_data, colWidths=[1.5*inch, 1*inch, 3.5*inch])
+        comp_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6b7280')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (1, -1), 'CENTER'),
+            ('ALIGN', (2, 0), (2, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f3f4f6')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP')
+        ]))
+        story.append(comp_table)
+        story.append(Spacer(1, 0.15*inch))
+    
+    # Overall Analysis
+    story.append(PageBreak())
+    story.append(Paragraph("Overall Analysis", heading_style))
+    story.append(Paragraph(comparison_result['overall_analysis'], styles['BodyText']))
+    story.append(Spacer(1, 0.2*inch))
+    
+    # Recommendations
+    story.append(Paragraph("Recommendations", heading_style))
+    story.append(Paragraph("<b>Solution 1:</b>", styles['Heading4']))
+    for rec in comparison_result['recommendations']['solution1']:
+        story.append(Paragraph(f"• {rec}", styles['BodyText']))
+    story.append(Spacer(1, 0.1*inch))
+    
+    story.append(Paragraph("<b>Solution 2:</b>", styles['Heading4']))
+    for rec in comparison_result['recommendations']['solution2']:
+        story.append(Paragraph(f"• {rec}", styles['BodyText']))
+    
+    doc.build(story)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes

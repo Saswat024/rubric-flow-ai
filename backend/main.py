@@ -8,11 +8,16 @@ from evaluators.flowchart import evaluate_flowchart
 from evaluators.pseudocode import evaluate_pseudocode
 from evaluators.algorithm import evaluate_algorithm
 from parsers.document_parser import parse_document
-from export.report_generator import generate_pdf_report, generate_csv_report
+from export.report_generator import generate_pdf_report, generate_csv_report, generate_comparison_pdf_report
 from database import (
     create_user, verify_user, create_session, verify_session, 
-    delete_session, get_user_email, save_evaluation, get_user_evaluations
+    delete_session, get_user_email, save_evaluation, get_user_evaluations,
+    save_comparison, get_user_comparisons, get_comparison_by_id
 )
+from analyzers.cfg_generator import pseudocode_to_cfg, flowchart_to_cfg, cfg_to_dict
+from analyzers.problem_analyzer import analyze_problem
+from analyzers.cfg_comparator import compare_cfgs
+from analyzers.cfg_visualizer import cfg_to_mermaid
 
 app = FastAPI()
 
@@ -48,6 +53,15 @@ class LoginRequest(BaseModel):
 class DocumentRequest(BaseModel):
     file: str  # base64 encoded file
     file_type: str  # .pdf, .docx, .pptx, .txt
+
+class SolutionInput(BaseModel):
+    type: str  # 'flowchart' or 'pseudocode'
+    content: str  # base64 for flowchart, text for pseudocode
+
+class ComparisonRequest(BaseModel):
+    problem_statement: str
+    solution1: SolutionInput
+    solution2: SolutionInput
 
 # Dependency to get current user from token
 async def get_current_user(authorization: Optional[str] = Header(None)) -> int:
@@ -251,6 +265,128 @@ async def api_export_csv(user_id: int = Depends(get_current_user)):
         )
     except Exception as e:
         print(f"Error generating CSV: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/compare-solutions")
+async def api_compare_solutions(request: ComparisonRequest, user_id: int = Depends(get_current_user)):
+    """Compare two solutions using CFG analysis"""
+    print("\n=== SOLUTION COMPARISON REQUEST RECEIVED ===")
+    try:
+        print(f"User ID: {user_id}")
+        print(f"Problem: {request.problem_statement[:100]}...")
+        print(f"Solution 1 type: {request.solution1.type}")
+        print(f"Solution 2 type: {request.solution2.type}")
+        
+        # Analyze problem statement
+        print("Analyzing problem...")
+        problem_analysis = await analyze_problem(request.problem_statement)
+        
+        # Generate CFGs for both solutions
+        print("Generating CFG for Solution 1...")
+        if request.solution1.type == 'flowchart':
+            cfg1 = await flowchart_to_cfg(request.solution1.content)
+        else:
+            cfg1 = await pseudocode_to_cfg(request.solution1.content)
+        
+        print("Generating CFG for Solution 2...")
+        if request.solution2.type == 'flowchart':
+            cfg2 = await flowchart_to_cfg(request.solution2.content)
+        else:
+            cfg2 = await pseudocode_to_cfg(request.solution2.content)
+        
+        # Compare CFGs
+        print("Comparing solutions...")
+        comparison_result = await compare_cfgs(cfg1, cfg2, problem_analysis)
+        
+        # Generate Mermaid visualizations
+        print("Generating visualizations...")
+        cfg1_mermaid = cfg_to_mermaid(cfg1, "Solution 1")
+        cfg2_mermaid = cfg_to_mermaid(cfg2, "Solution 2")
+        
+        # Convert CFGs to dict for storage
+        cfg1_dict = cfg_to_dict(cfg1)
+        cfg2_dict = cfg_to_dict(cfg2)
+        
+        # Save to database
+        overall_scores = {
+            'solution1': comparison_result['solution1_score'],
+            'solution2': comparison_result['solution2_score']
+        }
+        
+        comparison_id = save_comparison(
+            user_id=user_id,
+            problem_statement=request.problem_statement,
+            solution1_type=request.solution1.type,
+            solution1_content=request.solution1.content,
+            solution2_type=request.solution2.type,
+            solution2_content=request.solution2.content,
+            cfg1_json=json.dumps(cfg1_dict),
+            cfg2_json=json.dumps(cfg2_dict),
+            comparison_result=comparison_result,
+            winner=comparison_result['winner'],
+            overall_scores=overall_scores
+        )
+        
+        print(f"Comparison saved with ID: {comparison_id}")
+        
+        # Return complete result
+        return {
+            'comparison_id': comparison_id,
+            'winner': comparison_result['winner'],
+            'solution1_score': comparison_result['solution1_score'],
+            'solution2_score': comparison_result['solution2_score'],
+            'comparison': comparison_result['comparison'],
+            'overall_analysis': comparison_result['overall_analysis'],
+            'recommendations': comparison_result['recommendations'],
+            'cfg1': cfg1_dict,
+            'cfg2': cfg2_dict,
+            'cfg1_mermaid': cfg1_mermaid,
+            'cfg2_mermaid': cfg2_mermaid,
+            'problem_analysis': problem_analysis
+        }
+    except Exception as e:
+        print(f"\n!!! ERROR in solution comparison: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/comparisons")
+async def api_get_comparisons(user_id: int = Depends(get_current_user)):
+    """Get user's comparison history"""
+    try:
+        comparisons = get_user_comparisons(user_id)
+        return comparisons
+    except Exception as e:
+        print(f"Error fetching comparisons: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/export/comparison/{comparison_id}")
+async def api_export_comparison(comparison_id: int, user_id: int = Depends(get_current_user)):
+    """Export comparison as PDF"""
+    try:
+        comparison = get_comparison_by_id(comparison_id, user_id)
+        
+        if not comparison:
+            raise HTTPException(status_code=404, detail="Comparison not found")
+        
+        user_email = get_user_email(user_id)
+        
+        # Generate PDF
+        pdf_bytes = generate_comparison_pdf_report(comparison, user_email)
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename=comparison_{comparison_id}.pdf"
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error generating comparison PDF: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

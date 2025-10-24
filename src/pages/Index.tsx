@@ -1,14 +1,11 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { FlowchartEvaluator } from "@/components/FlowchartEvaluator";
-import { PseudocodeEvaluator } from "@/components/PseudocodeEvaluator";
-import { DocumentEvaluator } from "@/components/DocumentEvaluator";
-import { EvaluationHistory } from "@/components/EvaluationHistory";
+import { SolutionComparator } from "@/components/SolutionComparator";
+import { ComparisonHistory } from "@/components/ComparisonHistory";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileCode2, Workflow, LogOut, FileText } from "lucide-react";
+import { LogOut } from "lucide-react";
 
 const Index = () => {
   const { token, email, logout } = useAuth();
@@ -36,10 +33,10 @@ const Index = () => {
           <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
             <div className="flex-1 min-w-0">
               <h1 className="mb-2 text-4xl font-bold text-primary md:text-5xl">
-                Intelligent Rubrics-Based Evaluator
+                Solution Comparison Platform
               </h1>
               <p className="text-lg text-muted-foreground">
-                Automated evaluation for flowcharts, algorithms, and pseudocode
+                Compare two algorithm solutions using Control Flow Graph analysis
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -55,38 +52,11 @@ const Index = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mx-auto max-w-7xl">
           <div className="lg:col-span-2">
-            <Tabs defaultValue="flowchart" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 mb-6">
-                <TabsTrigger value="flowchart" className="gap-2">
-                  <Workflow className="h-4 w-4" />
-                  Flowchart
-                </TabsTrigger>
-                <TabsTrigger value="pseudocode" className="gap-2">
-                  <FileCode2 className="h-4 w-4" />
-                  Pseudocode
-                </TabsTrigger>
-                <TabsTrigger value="document" className="gap-2">
-                  <FileText className="h-4 w-4" />
-                  Document
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="flowchart">
-                <FlowchartEvaluator />
-              </TabsContent>
-
-              <TabsContent value="pseudocode">
-                <PseudocodeEvaluator />
-              </TabsContent>
-
-              <TabsContent value="document">
-                <DocumentEvaluator />
-              </TabsContent>
-            </Tabs>
+            <SolutionComparator />
           </div>
 
           <div className="lg:col-span-1">
-            <EvaluationHistory />
+            <ComparisonHistory />
           </div>
         </div>
       </div>
