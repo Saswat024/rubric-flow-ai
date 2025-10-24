@@ -237,7 +237,7 @@ def generate_comparison_pdf_report(comparison: dict, user_email: str) -> bytes:
         ['Solution 1', str(comparison['overall_scores']['solution1'])],
         ['Solution 2', str(comparison['overall_scores']['solution2'])]
     ]
-    scores_table = Table(scores_data, colWidths=[3*inch, 2*inch])
+    scores_table = Table(scores_data, colWidths=[2.5*inch, 1.5*inch])
     scores_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3b82f6')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -258,13 +258,14 @@ def generate_comparison_pdf_report(comparison: dict, user_email: str) -> bytes:
     for criterion, data in comparison_result['comparison'].items():
         story.append(Paragraph(f"<b>{criterion.title()}</b>", styles['Heading3']))
         
+        # Wrap feedback text in Paragraph objects for proper text wrapping
         comp_data = [
             ['Solution', 'Score', 'Feedback'],
-            ['Solution 1', str(data['solution1']['score']), data['solution1']['feedback']],
-            ['Solution 2', str(data['solution2']['score']), data['solution2']['feedback']]
+            ['Solution 1', str(data['solution1']['score']), Paragraph(data['solution1']['feedback'], styles['BodyText'])],
+            ['Solution 2', str(data['solution2']['score']), Paragraph(data['solution2']['feedback'], styles['BodyText'])]
         ]
         
-        comp_table = Table(comp_data, colWidths=[1.5*inch, 1*inch, 3.5*inch])
+        comp_table = Table(comp_data, colWidths=[1.2*inch, 0.8*inch, 4*inch])
         comp_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6b7280')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -272,7 +273,10 @@ def generate_comparison_pdf_report(comparison: dict, user_email: str) -> bytes:
             ('ALIGN', (2, 0), (2, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 1), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
             ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f3f4f6')),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
             ('VALIGN', (0, 0), (-1, -1), 'TOP')
