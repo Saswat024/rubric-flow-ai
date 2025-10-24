@@ -52,12 +52,6 @@ npm run dev
 ```bash
 cd backend
 pip install -r requirements.txt
-
-# Copy and configure environment variables
-cp .env.example .env
-# Edit .env and add your Google API key:
-# GOOGLE_API_KEY=your_google_api_key_here
-
 python start.py
 ```
 
