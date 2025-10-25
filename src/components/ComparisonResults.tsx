@@ -3,6 +3,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, Medal, Award } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { useEffect, useRef, useState } from "react";
+import mermaid from "mermaid";
 
 interface ComparisonResultsProps {
   result: {
@@ -17,7 +19,78 @@ interface ComparisonResultsProps {
   };
 }
 
+const MermaidDiagram = ({ code, id }: { code: string; id: string }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [svg, setSvg] = useState<string>('');
+  const [error, setError] = useState<string>('');
+
+  useEffect(() => {
+    const renderDiagram = async () => {
+      if (!code) {
+        setError('No diagram code provided');
+        return;
+      }
+      
+      try {
+        // Clean up any existing mermaid elements
+        const existingElement = document.getElementById(`${id}-${Date.now()}`);
+        if (existingElement) {
+          existingElement.remove();
+        }
+
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: 'base',
+          themeVariables: {
+            primaryColor: '#3b82f6',
+            primaryTextColor: '#ffffff',
+            primaryBorderColor: '#1e40af',
+            lineColor: '#6b7280',
+            secondaryColor: '#f59e0b',
+            tertiaryColor: '#10b981',
+            background: '#1e293b',
+            mainBkg: '#334155',
+            secondBkg: '#475569'
+          },
+          securityLevel: 'loose'
+        });
+        
+        const uniqueId = `${id}-${Date.now()}`;
+        const { svg: renderedSvg } = await mermaid.render(uniqueId, code);
+        setSvg(renderedSvg);
+        setError('');
+      } catch (err: any) {
+        console.error('Mermaid rendering error for', id, ':', err);
+        console.log('Failed code:', code);
+        setError(err.message || 'Failed to render diagram');
+        // Show the raw code as fallback
+        setSvg(`<pre class="text-xs text-muted-foreground whitespace-pre-wrap p-4 bg-slate-800 rounded">${code}</pre>`);
+      }
+    };
+
+    renderDiagram();
+  }, [code, id]);
+
+  if (error && !svg) {
+    return (
+      <div className="text-sm text-red-400 p-4">
+        <p className="font-semibold mb-2">Error rendering diagram: {error}</p>
+        <pre className="text-xs text-muted-foreground whitespace-pre-wrap bg-slate-800 p-4 rounded mt-2">{code}</pre>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      ref={ref} 
+      className="mermaid-diagram flex justify-center"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
+};
+
 export const ComparisonResults = ({ result }: ComparisonResultsProps) => {
+
   const getWinnerBadge = (solution: string) => {
     if (result.winner === solution) {
       return <Badge className="bg-success text-success-foreground"><Trophy className="h-3 w-3 mr-1" />Winner</Badge>;
@@ -25,14 +98,6 @@ export const ComparisonResults = ({ result }: ComparisonResultsProps) => {
       return <Badge variant="secondary"><Medal className="h-3 w-3 mr-1" />Tie</Badge>;
     }
     return null;
-  };
-
-  const renderMermaid = (mermaidCode: string) => {
-    return (
-      <div className="mermaid-container overflow-x-auto p-4 bg-muted rounded-lg">
-        <pre className="mermaid text-sm">{mermaidCode}</pre>
-      </div>
-    );
   };
 
   return (
@@ -102,11 +167,15 @@ export const ComparisonResults = ({ result }: ComparisonResultsProps) => {
           <TabsContent value="cfgs" className="space-y-6">
             <div>
               <h3 className="text-lg font-semibold mb-3 text-card-foreground">Solution 1 - Control Flow Graph</h3>
-              {renderMermaid(result.cfg1_mermaid)}
+              <div className="overflow-x-auto p-4 bg-muted rounded-lg">
+                <MermaidDiagram code={result.cfg1_mermaid} id="cfg1" />
+              </div>
             </div>
             <div>
               <h3 className="text-lg font-semibold mb-3 text-card-foreground">Solution 2 - Control Flow Graph</h3>
-              {renderMermaid(result.cfg2_mermaid)}
+              <div className="overflow-x-auto p-4 bg-muted rounded-lg">
+                <MermaidDiagram code={result.cfg2_mermaid} id="cfg2" />
+              </div>
             </div>
           </TabsContent>
 

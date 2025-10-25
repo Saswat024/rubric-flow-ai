@@ -131,3 +131,53 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Mermaid diagram styling */
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-diagram .node rect,
+.mermaid-diagram .node circle,
+.mermaid-diagram .node ellipse,
+.mermaid-diagram .node polygon {
+  stroke-width: 2px;
+}
+
+.mermaid-diagram .edgePath path {
+  stroke-width: 2px;
+}
+
+/* Style edge labels properly */
+.mermaid-diagram .edgeLabel {
+  background-color: transparent !important;
+}
+
+.mermaid-diagram .edgeLabel rect {
+  fill: #1e293b !important;
+  stroke: none !important;
+  rx: 4 !important;
+  ry: 4 !important;
+}
+
+.mermaid-diagram .edgeLabel .label {
+  color: #ffffff !important;
+  fill: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+.mermaid-diagram .edgeLabel foreignObject {
+  overflow: visible !important;
+}
+
+.mermaid-diagram .edgeLabel foreignObject > div {
+  background-color: #1e293b !important;
+  color: #ffffff !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+}

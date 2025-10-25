@@ -10,13 +10,22 @@ def cfg_to_mermaid(cfg: CFG, title: str = "CFG") -> str:
     # Add nodes
     for node in cfg.nodes:
         node_shape = get_mermaid_shape(node.type)
-        label = node.label.replace('"', "'")
+        # Escape special characters for Mermaid
+        label = node.label.replace('"', "'").replace('#', '').replace('<', '').replace('>', '').replace('*', 'x')
+        # Limit label length to prevent syntax errors
+        if len(label) > 50:
+            label = label[:47] + '...'
         mermaid_lines.append(f"    {node.id}{node_shape[0]}\"{label}\"{node_shape[1]}")
     
-    # Add edges
+    # Process edges - add labels only for decision branches
+    decision_nodes = {node.id: node for node in cfg.nodes if node.type == "DECISION"}
+    edge_counts = {}
+    
     for edge in cfg.edges:
-        label = edge.get('label', '')
-        if label:
+        if edge['from'] in decision_nodes:
+            count = edge_counts.get(edge['from'], 0)
+            label = "True" if count == 0 else "False"
+            edge_counts[edge['from']] = count + 1
             mermaid_lines.append(f"    {edge['from']} -->|{label}| {edge['to']}")
         else:
             mermaid_lines.append(f"    {edge['from']} --> {edge['to']}")
@@ -26,7 +35,7 @@ def cfg_to_mermaid(cfg: CFG, title: str = "CFG") -> str:
     mermaid_lines.append("    classDef decision fill:#f59e0b,stroke:#d97706,color:#fff")
     mermaid_lines.append("    classDef process fill:#3b82f6,stroke:#2563eb,color:#fff")
     
-    # Apply styles
+    # Apply styles (use ::: syntax which is more reliable)
     for node in cfg.nodes:
         if node.type in ["START", "END"]:
             mermaid_lines.append(f"    class {node.id} startEnd")

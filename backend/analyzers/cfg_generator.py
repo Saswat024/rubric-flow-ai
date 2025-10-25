@@ -68,8 +68,8 @@ Return ONLY a valid JSON object in this exact format:
   ],
   "edges": [
     {"from": "node1", "to": "node2", "label": ""},
-    {"from": "node2", "to": "node3", "label": "true"},
-    {"from": "node2", "to": "node4", "label": "false"}
+    {"from": "node2", "to": "node3", "label": "True"},
+    {"from": "node2", "to": "node4", "label": "False"}
   ],
   "complexity": 2,
   "num_paths": 2,
@@ -78,8 +78,9 @@ Return ONLY a valid JSON object in this exact format:
 
 Guidelines:
 - Create unique IDs for each node (node1, node2, etc.)
-- For DECISION nodes, create branches for all conditions
-- For LOOP nodes, create back edges
+- For DECISION nodes, create branches with labels "True" and "False" or "Yes" and "No"
+- For LOOP nodes, create back edges with labels like "Continue" and "Exit"
+- Leave label empty ("") for sequential flow edges
 - Calculate cyclomatic complexity accurately
 - Consider all possible execution paths"""
 
