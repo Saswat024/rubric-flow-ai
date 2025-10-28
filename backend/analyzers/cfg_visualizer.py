@@ -11,7 +11,7 @@ def cfg_to_mermaid(cfg: CFG, title: str = "CFG") -> str:
     for node in cfg.nodes:
         node_shape = get_mermaid_shape(node.type)
         # Escape special characters for Mermaid
-        label = node.label.replace('"', "'").replace('#', '').replace('<', '').replace('>', '').replace('*', 'x')
+        label = node.label.replace('"', "'").replace('#', '').replace('*', 'x')
         # Limit label length to prevent syntax errors
         if len(label) > 50:
             label = label[:47] + '...'
