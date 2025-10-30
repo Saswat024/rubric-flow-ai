@@ -13,25 +13,22 @@ from export.report_generator import generate_pdf_report, generate_csv_report, ge
 from database import (
     create_user, verify_user, create_session, verify_session, 
     delete_session, get_user_email, save_evaluation, get_user_evaluations,
-    save_comparison, get_user_comparisons, get_comparison_by_id
+    save_comparison, get_user_comparisons, get_comparison_by_id,
+    find_similar_problem, create_problem, update_problem_cfg, get_problem_by_id,
+    save_solution, get_reference_solution, get_problem_solutions, get_db_connection
 )
 from analyzers.cfg_generator import pseudocode_to_cfg, flowchart_to_cfg, cfg_to_dict
 from analyzers.problem_analyzer import analyze_problem
 from analyzers.cfg_comparator import compare_cfgs
 from analyzers.cfg_visualizer import cfg_to_mermaid
+from analyzers.cfg_canonicalizer import canonicalize_cfg, calculate_cfg_similarity
 
 app = FastAPI()
 
 # Enable CORS for local React app
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173", 
-        "http://localhost:8080", 
-        "http://localhost:3000",
-        "https://*.railway.app",
-        "https://*.up.railway.app"
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -387,3 +384,248 @@ async def api_export_comparison(comparison_id: int, user_id: int = Depends(get_c
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+
+class ProblemUploadRequest(BaseModel):
+    problem_statement: str
+
+class ReferenceSolutionRequest(BaseModel):
+    problem_id: int
+    solution_type: str
+    solution_content: str
+
+class EvaluateSolutionRequest(BaseModel):
+    problem_id: int
+    solution_type: str
+    solution_content: str
+
+
+@app.post("/api/upload-problem")
+async def api_upload_problem(request: ProblemUploadRequest, user_id: int = Depends(get_current_user)):
+    """Upload or find existing problem"""
+    try:
+        similar = find_similar_problem(request.problem_statement)
+        
+        if similar:
+            reference = get_reference_solution(similar['id'])
+            return {
+                "status": "found",
+                "problem_id": similar['id'],
+                "problem_statement": similar['problem_statement'],
+                "bottom_line_cfg": similar['bottom_line_cfg'],
+                "reference_solution_exists": reference is not None,
+                "similarity_score": similar['similarity_score']
+            }
+        
+        problem_id = create_problem(request.problem_statement)
+        return {
+            "status": "new_problem",
+            "problem_id": problem_id,
+            "problem_statement": request.problem_statement,
+            "bottom_line_cfg": None,
+            "reference_solution_exists": False,
+            "similarity_score": 0
+        }
+    except Exception as e:
+        print(f"Error uploading problem: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/fetch-reference-solution/{problem_id}")
+async def api_fetch_reference(problem_id: int, user_id: int = Depends(get_current_user)):
+    """Fetch reference solution for a problem"""
+    try:
+        problem = get_problem_by_id(problem_id)
+        if not problem:
+            raise HTTPException(status_code=404, detail="Problem not found")
+        
+        reference = get_reference_solution(problem_id)
+        
+        if not reference:
+            return {"exists": False}
+        
+        mermaid = cfg_to_mermaid(reference['cfg_json'], "Reference Solution")
+        
+        return {
+            "exists": True,
+            "solution_type": reference['solution_type'],
+            "solution_content": reference['solution_content'],
+            "bottom_line_cfg": problem['bottom_line_cfg'],
+            "mermaid_diagram": mermaid,
+            "optimal_complexity": {
+                "time": problem['optimal_time_complexity'],
+                "space": problem['optimal_space_complexity']
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching reference: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/upload-reference-solution")
+async def api_upload_reference(request: ReferenceSolutionRequest, user_id: int = Depends(get_current_user)):
+    """Upload reference solution and generate bottom-line CFG"""
+    try:
+        problem = get_problem_by_id(request.problem_id)
+        if not problem:
+            raise HTTPException(status_code=404, detail="Problem not found")
+        
+        # Generate CFG
+        if request.solution_type == 'flowchart':
+            cfg = await flowchart_to_cfg(request.solution_content)
+        else:
+            cfg = await pseudocode_to_cfg(request.solution_content)
+        
+        # Canonicalize to bottom-line CFG
+        bottom_line_cfg = await canonicalize_cfg(cfg, problem['problem_statement'])
+        
+        # Extract complexity from canonicalized CFG
+        time_complexity = bottom_line_cfg.get('time_complexity', 'O(n)')
+        space_complexity = bottom_line_cfg.get('space_complexity', 'O(1)')
+        
+        # Update problem with bottom-line CFG
+        update_problem_cfg(request.problem_id, bottom_line_cfg, time_complexity, space_complexity)
+        
+        # Save reference solution
+        cfg_dict = cfg_to_dict(cfg)
+        save_solution(request.problem_id, request.solution_type, request.solution_content, 
+                     cfg_dict, is_reference=True, user_id=user_id)
+        
+        mermaid = cfg_to_mermaid(bottom_line_cfg, "Bottom-Line CFG")
+        
+        return {
+            "success": True,
+            "problem_id": request.problem_id,
+            "bottom_line_cfg": bottom_line_cfg,
+            "mermaid_diagram": mermaid,
+            "complexity_analysis": {
+                "time": time_complexity,
+                "space": space_complexity
+            }
+        }
+    except Exception as e:
+        print(f"Error uploading reference: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/evaluate-solution")
+async def api_evaluate_solution(request: EvaluateSolutionRequest, user_id: int = Depends(get_current_user)):
+    """Evaluate user solution against bottom-line CFG"""
+    try:
+        problem = get_problem_by_id(request.problem_id)
+        if not problem or not problem['bottom_line_cfg']:
+            raise HTTPException(status_code=400, detail="No reference solution available for this problem")
+        
+        # Generate CFG from user solution
+        if request.solution_type == 'flowchart':
+            user_cfg = await flowchart_to_cfg(request.solution_content)
+        else:
+            user_cfg = await pseudocode_to_cfg(request.solution_content)
+        
+        user_cfg_dict = cfg_to_dict(user_cfg)
+        
+        # Compare with bottom-line CFG
+        evaluation = await calculate_cfg_similarity(user_cfg_dict, problem['bottom_line_cfg'])
+        
+        # Save user solution
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, evaluation_score FROM solutions WHERE problem_id = ? AND user_id = ? AND is_reference_solution = 0",
+                (request.problem_id, user_id)
+            )
+            existing = cursor.fetchone()
+            if existing and existing[1] and existing[1] >= evaluation["total_score"]:
+                solution_id = existing[0]
+            elif existing:
+                cursor.execute(
+                    "UPDATE solutions SET solution_content = ?, cfg_json = ?, evaluation_score = ?, evaluation_result = ? WHERE id = ?",
+                    (request.solution_content[:5000], json.dumps(user_cfg_dict), evaluation["total_score"], json.dumps(evaluation), existing[0])
+                )
+                conn.commit()
+                solution_id = existing[0]
+            else:
+                solution_id = save_solution(
+                    request.problem_id, request.solution_type, request.solution_content,
+                    user_cfg_dict, is_reference=False, user_id=user_id,
+                    evaluation_score=evaluation["total_score"], evaluation_result=evaluation
+                )
+
+        # Generate visualizations
+        user_mermaid = cfg_to_mermaid(user_cfg_dict, "Your Solution")
+        reference_mermaid = cfg_to_mermaid(problem['bottom_line_cfg'], "Reference Solution")
+        
+        return {
+            "evaluation_id": solution_id,
+            "total_score": evaluation['total_score'],
+            "breakdown": evaluation['breakdown'],
+            "cfg_comparison": {
+                "user_cfg": user_cfg_dict,
+                "reference_cfg": problem['bottom_line_cfg'],
+                "differences": evaluation.get('differences', []),
+                "missing_paths": evaluation.get('missing_paths', []),
+                "extra_paths": evaluation.get('extra_paths', [])
+            },
+            "mermaid_diagrams": {
+                "user": user_mermaid,
+                "reference": reference_mermaid
+            },
+            "recommendations": evaluation.get('recommendations', [])
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error evaluating solution: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/problems")
+async def api_get_problems(user_id: int = Depends(get_current_user)):
+    """Get all problems with statistics"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT p.id, p.problem_statement, p.problem_category, p.created_at,
+                       COUNT(s.id) as solution_count,
+                       AVG(s.evaluation_score) as avg_score
+                FROM problems p
+                LEFT JOIN solutions s ON p.id = s.problem_id
+                GROUP BY p.id
+                ORDER BY p.created_at DESC
+                LIMIT 50
+            """)
+            results = cursor.fetchall()
+            
+            return [{
+                'id': r[0],
+                'problem_statement': r[1][:200] + '...' if len(r[1]) > 200 else r[1],
+                'category': r[2],
+                'created_at': r[3],
+                'solution_count': r[4] or 0,
+                'avg_score': round(r[5], 1) if r[5] else None
+            } for r in results]
+    except Exception as e:
+        print(f"Error fetching problems: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/problems/{problem_id}")
+async def api_delete_problem(problem_id: int, user_id: int = Depends(get_current_user)):
+    """Delete a problem and its associated solutions"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM solutions WHERE problem_id = ?", (problem_id,))
+            cursor.execute("DELETE FROM problems WHERE id = ?", (problem_id,))
+            conn.commit()
+            return {"success": True, "message": "Problem deleted"}
+    except Exception as e:
+        print(f"Error deleting problem: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

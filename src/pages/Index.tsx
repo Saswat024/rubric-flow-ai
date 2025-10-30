@@ -5,7 +5,7 @@ import { SolutionComparator } from "@/components/SolutionComparator";
 import { ComparisonHistory } from "@/components/ComparisonHistory";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
-import { LogOut } from "lucide-react";
+import { LogOut, Database } from "lucide-react";
 
 const Index = () => {
   const { token, email, logout } = useAuth();
@@ -41,6 +41,10 @@ const Index = () => {
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground truncate max-w-[200px]">{email}</span>
+              <Button variant="outline" size="sm" onClick={() => navigate('/problem-solver')}>
+                <Database className="h-4 w-4 mr-2" />
+                Problem Database
+              </Button>
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout

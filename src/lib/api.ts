@@ -8,6 +8,71 @@ function getAuthHeaders() {
   };
 }
 
+export const api = {
+  get: async (endpoint: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('Not authenticated');
+    
+    const response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
+      method: "GET",
+      headers: getAuthHeaders(),
+    });
+    
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      throw new Error('Session expired');
+    }
+    
+    if (!response.ok) throw new Error(`Request failed: ${response.statusText}`);
+    return response;
+  },
+  
+  post: async (endpoint: string, data: any) => {
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('Not authenticated');
+    
+    const response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+    
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      throw new Error('Session expired');
+    }
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Request failed: ${response.statusText}`);
+    }
+    
+    return response;
+  },
+  
+  delete: async (endpoint: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('Not authenticated');
+    
+    const response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
+    
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      throw new Error('Session expired');
+    }
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Request failed: ${response.statusText}`);
+    }
+    
+    return response;
+  }
+};
+
 export async function evaluateFlowchart(imageBase64: string) {
   const token = localStorage.getItem('token');
   if (!token) {

@@ -1,6 +1,9 @@
 import sqlite3
 import bcrypt
 import secrets
+import hashlib
+import difflib
+import json
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 from contextlib import contextmanager
@@ -76,6 +79,41 @@ def init_database():
                 winner TEXT NOT NULL,
                 overall_scores TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        """)
+        
+        # Create problems table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS problems (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                problem_statement TEXT NOT NULL,
+                problem_hash TEXT UNIQUE NOT NULL,
+                bottom_line_cfg TEXT,
+                optimal_time_complexity TEXT,
+                optimal_space_complexity TEXT,
+                problem_category TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_problem_hash ON problems(problem_hash)")
+        
+        # Create solutions table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS solutions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                problem_id INTEGER NOT NULL,
+                solution_type TEXT NOT NULL,
+                solution_content TEXT NOT NULL,
+                cfg_json TEXT NOT NULL,
+                evaluation_score INTEGER,
+                evaluation_result TEXT,
+                is_reference_solution BOOLEAN DEFAULT 0,
+                user_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (problem_id) REFERENCES problems (id),
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         """)
@@ -185,7 +223,6 @@ def get_user_email(user_id: int) -> Optional[str]:
 
 def save_evaluation(user_id: int, eval_type: str, content: str, result: dict) -> int:
     """Save an evaluation result. Returns evaluation_id"""
-    import json
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -201,7 +238,6 @@ def save_evaluation(user_id: int, eval_type: str, content: str, result: dict) ->
 
 def get_user_evaluations(user_id: int, limit: int = 10):
     """Get recent evaluations for a user"""
-    import json
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -229,7 +265,6 @@ def save_comparison(user_id: int, problem_statement: str, solution1_type: str, s
                    solution2_type: str, solution2_content: str, cfg1_json: str, cfg2_json: str,
                    comparison_result: dict, winner: str, overall_scores: dict) -> int:
     """Save a solution comparison. Returns comparison_id"""
-    import json
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -250,7 +285,6 @@ def save_comparison(user_id: int, problem_statement: str, solution1_type: str, s
 
 def get_user_comparisons(user_id: int, limit: int = 20):
     """Get recent comparisons for a user"""
-    import json
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -281,7 +315,6 @@ def get_user_comparisons(user_id: int, limit: int = 20):
 
 def get_comparison_by_id(comparison_id: int, user_id: int):
     """Get a specific comparison by ID"""
-    import json
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -312,6 +345,146 @@ def get_comparison_by_id(comparison_id: int, user_id: int):
             }
     except Exception:
         return None
+
+
+def normalize_problem_statement(statement: str) -> str:
+    """Normalize problem statement for consistent hashing"""
+    normalized = statement.lower().strip()
+    normalized = ' '.join(normalized.split())
+    replacements = {
+        'array': 'list', 'maximum': 'max', 'minimum': 'min',
+        'integer': 'int', 'string': 'str'
+    }
+    for old, new in replacements.items():
+        normalized = normalized.replace(old, new)
+    return normalized
+
+def hash_problem(statement: str) -> str:
+    """Generate hash for problem statement"""
+    normalized = normalize_problem_statement(statement)
+    return hashlib.sha256(normalized.encode()).hexdigest()
+
+def find_similar_problem(statement: str, threshold: float = 0.85):
+    """Find similar problem in database"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, problem_statement, problem_hash, bottom_line_cfg FROM problems")
+        problems = cursor.fetchall()
+        
+        normalized_input = normalize_problem_statement(statement)
+        best_match = None
+        best_score = 0
+        
+        for problem in problems:
+            normalized_existing = normalize_problem_statement(problem[1])
+            similarity = difflib.SequenceMatcher(None, normalized_input, normalized_existing).ratio()
+            
+            if similarity > best_score:
+                best_score = similarity
+                best_match = problem
+        
+        if best_score >= threshold:
+            return {
+                'id': best_match[0],
+                'problem_statement': best_match[1],
+                'problem_hash': best_match[2],
+                'bottom_line_cfg': json.loads(best_match[3]) if best_match[3] else None,
+                'similarity_score': best_score
+            }
+        return None
+
+def create_problem(statement: str) -> int:
+    """Create new problem entry"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        problem_hash = hash_problem(statement)
+        cursor.execute(
+            "INSERT INTO problems (problem_statement, problem_hash) VALUES (?, ?)",
+            (statement, problem_hash)
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+def update_problem_cfg(problem_id: int, bottom_line_cfg: dict, time_complexity: str, space_complexity: str, category: str = None):
+    """Update problem with bottom-line CFG"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """UPDATE problems SET bottom_line_cfg = ?, optimal_time_complexity = ?, 
+               optimal_space_complexity = ?, problem_category = ?, updated_at = CURRENT_TIMESTAMP 
+               WHERE id = ?""",
+            (json.dumps(bottom_line_cfg), time_complexity, space_complexity, category, problem_id)
+        )
+        conn.commit()
+
+def get_problem_by_id(problem_id: int):
+    """Get problem by ID"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, problem_statement, bottom_line_cfg, optimal_time_complexity, optimal_space_complexity, problem_category FROM problems WHERE id = ?",
+            (problem_id,)
+        )
+        row = cursor.fetchone()
+        if row:
+            return {
+                'id': row[0],
+                'problem_statement': row[1],
+                'bottom_line_cfg': json.loads(row[2]) if row[2] else None,
+                'optimal_time_complexity': row[3],
+                'optimal_space_complexity': row[4],
+                'problem_category': row[5]
+            }
+        return None
+
+def save_solution(problem_id: int, solution_type: str, solution_content: str, cfg_json: dict, 
+                  is_reference: bool = False, user_id: int = None, evaluation_score: int = None, evaluation_result: dict = None):
+    """Save solution to database"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO solutions (problem_id, solution_type, solution_content, cfg_json, 
+               is_reference_solution, user_id, evaluation_score, evaluation_result) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (problem_id, solution_type, solution_content[:5000], json.dumps(cfg_json), 
+             is_reference, user_id, evaluation_score, json.dumps(evaluation_result) if evaluation_result else None)
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+def get_reference_solution(problem_id: int):
+    """Get reference solution for a problem"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT id, solution_type, solution_content, cfg_json FROM solutions 
+               WHERE problem_id = ? AND is_reference_solution = 1 LIMIT 1""",
+            (problem_id,)
+        )
+        row = cursor.fetchone()
+        if row:
+            return {
+                'id': row[0],
+                'solution_type': row[1],
+                'solution_content': row[2],
+                'cfg_json': json.loads(row[3])
+            }
+        return None
+
+def get_problem_solutions(problem_id: int, limit: int = 50):
+    """Get all solutions for a problem"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT id, solution_type, evaluation_score, is_reference_solution, created_at 
+               FROM solutions WHERE problem_id = ? ORDER BY created_at DESC LIMIT ?""",
+            (problem_id, limit)
+        )
+        results = cursor.fetchall()
+        return [{
+            'id': r[0], 'solution_type': r[1], 'evaluation_score': r[2],
+            'is_reference': bool(r[3]), 'created_at': r[4]
+        } for r in results]
 
 
 # Initialize database on module import
