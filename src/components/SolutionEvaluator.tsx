@@ -6,9 +6,10 @@ import { Textarea } from './ui/textarea';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
 import { Label } from './ui/label';
+import { Dialog, DialogContent } from './ui/dialog';
 import { toast } from 'sonner';
 import { api } from '../lib/api';
-import { ImagePlus, FileCode2, X } from 'lucide-react';
+import { ImagePlus, FileCode2, X, ZoomIn } from 'lucide-react';
 
 interface SolutionEvaluatorProps {
   problemId: number | null;
@@ -21,15 +22,13 @@ export default function SolutionEvaluator({ problemId, hasReference }: SolutionE
   const [pseudocode, setPseudocode] = useState('');
   const [flowchartImage, setFlowchartImage] = useState('');
   const [evaluation, setEvaluation] = useState<any>(null);
+  const [zoomedDiagram, setZoomedDiagram] = useState<{svg: string, code: string} | null>(null);
 
   useEffect(() => {
     if (evaluation?.mermaid_diagrams?.user && evaluation?.mermaid_diagrams?.reference) {
       const renderMermaid = async () => {
         const mermaid = (await import('mermaid')).default;
-        mermaid.initialize({ startOnLoad: false, theme: 'dark' });
-        
-        const elements = document.querySelectorAll('.mermaid');
-        elements.forEach(el => el.removeAttribute('data-processed'));
+        mermaid.initialize({ startOnLoad: false, theme: 'default' });
         
         setTimeout(() => {
           mermaid.run().catch(err => console.error('Mermaid error:', err));
@@ -37,7 +36,7 @@ export default function SolutionEvaluator({ problemId, hasReference }: SolutionE
       };
       renderMermaid();
     }
-  }, [evaluation]);
+  }, [evaluation, zoomedDiagram]);
 
   const handleEvaluate = async () => {
     if (!problemId) {
@@ -204,35 +203,65 @@ export default function SolutionEvaluator({ problemId, hasReference }: SolutionE
             )}
 
             {evaluation.mermaid_diagrams && evaluation.mermaid_diagrams.user && evaluation.mermaid_diagrams.reference && (
-              <Card className="mt-6 border-2">
-                <CardHeader className="bg-muted/50">
-                  <CardTitle className="text-base">CFG Comparison</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Card className="border-blue-500/50">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm text-blue-600 dark:text-blue-400">Your Solution</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="p-4 bg-white dark:bg-gray-950 rounded-lg overflow-auto border">
-                          <div className="mermaid">{evaluation.mermaid_diagrams.user}</div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card className="border-green-500/50">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm text-green-600 dark:text-green-400">Reference Solution</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="p-4 bg-white dark:bg-gray-950 rounded-lg overflow-auto border">
-                          <div className="mermaid">{evaluation.mermaid_diagrams.reference}</div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="mt-6 space-y-4">
+                <h3 className="text-lg font-bold text-card-foreground">CFG Comparison</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card className="border-blue-500/50 bg-gradient-to-br from-blue-500/5 to-blue-500/10">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm text-blue-600 dark:text-blue-400 flex items-center justify-between">
+                        Your Solution
+                        <Button variant="ghost" size="sm" onClick={async () => {
+                          const mermaid = (await import('mermaid')).default;
+                          const {svg} = await mermaid.render('zoomed-user', evaluation.mermaid_diagrams.user);
+                          setZoomedDiagram({svg, code: evaluation.mermaid_diagrams.user});
+                        }}>
+                          <ZoomIn className="h-4 w-4" />
+                        </Button>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="p-4 bg-background rounded-lg overflow-auto border border-blue-500/30 max-h-[500px] cursor-pointer" onClick={async () => {
+                        const mermaid = (await import('mermaid')).default;
+                        const {svg} = await mermaid.render('zoomed-user-click', evaluation.mermaid_diagrams.user);
+                        setZoomedDiagram({svg, code: evaluation.mermaid_diagrams.user});
+                      }}>
+                        <div className="mermaid">{evaluation.mermaid_diagrams.user}</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-green-500/50 bg-gradient-to-br from-green-500/5 to-green-500/10">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm text-green-600 dark:text-green-400 flex items-center justify-between">
+                        Reference Solution
+                        <Button variant="ghost" size="sm" onClick={async () => {
+                          const mermaid = (await import('mermaid')).default;
+                          const {svg} = await mermaid.render('zoomed-ref', evaluation.mermaid_diagrams.reference);
+                          setZoomedDiagram({svg, code: evaluation.mermaid_diagrams.reference});
+                        }}>
+                          <ZoomIn className="h-4 w-4" />
+                        </Button>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="p-4 bg-background rounded-lg overflow-auto border border-green-500/30 max-h-[500px] cursor-pointer" onClick={async () => {
+                        const mermaid = (await import('mermaid')).default;
+                        const {svg} = await mermaid.render('zoomed-ref-click', evaluation.mermaid_diagrams.reference);
+                        setZoomedDiagram({svg, code: evaluation.mermaid_diagrams.reference});
+                      }}>
+                        <div className="mermaid">{evaluation.mermaid_diagrams.reference}</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Dialog open={!!zoomedDiagram} onOpenChange={() => setZoomedDiagram(null)}>
+                  <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-hidden flex flex-col">
+                    <div className="flex-1 overflow-auto p-8">
+                      <div className="flex items-center justify-center min-h-full" dangerouslySetInnerHTML={{ __html: zoomedDiagram?.svg || '' }} />
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             )}
           </div>
         )}

@@ -32,26 +32,9 @@ const MermaidDiagram = ({ code, id }: { code: string; id: string }) => {
       }
       
       try {
-        // Clean up any existing mermaid elements
-        const existingElement = document.getElementById(`${id}-${Date.now()}`);
-        if (existingElement) {
-          existingElement.remove();
-        }
-
         mermaid.initialize({
           startOnLoad: false,
-          theme: 'base',
-          themeVariables: {
-            primaryColor: '#3b82f6',
-            primaryTextColor: '#ffffff',
-            primaryBorderColor: '#1e40af',
-            lineColor: '#6b7280',
-            secondaryColor: '#f59e0b',
-            tertiaryColor: '#10b981',
-            background: '#1e293b',
-            mainBkg: '#334155',
-            secondBkg: '#475569'
-          },
+          theme: 'default',
           securityLevel: 'loose'
         });
         
@@ -61,10 +44,8 @@ const MermaidDiagram = ({ code, id }: { code: string; id: string }) => {
         setError('');
       } catch (err: any) {
         console.error('Mermaid rendering error for', id, ':', err);
-        console.log('Failed code:', code);
         setError(err.message || 'Failed to render diagram');
-        // Show the raw code as fallback
-        setSvg(`<pre class="text-xs text-muted-foreground whitespace-pre-wrap p-4 bg-slate-800 rounded">${code}</pre>`);
+        setSvg(`<pre class="text-xs text-muted-foreground whitespace-pre-wrap p-4 bg-muted rounded">${code}</pre>`);
       }
     };
 

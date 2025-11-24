@@ -122,7 +122,8 @@ Critical: Return ONLY the JSON object with no surrounding text, markdown code bl
     image_bytes = base64.b64decode(image_data)
     image = Image.open(BytesIO(image_bytes))
 
-    model = genai.GenerativeModel("gemini-2.5-flash-lite")
+    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+    model = genai.GenerativeModel(model_name)
     prompt = f"{system_prompt}\n\nEvaluate this flowchart based on the rubrics. Provide detailed scoring and feedback."
     response = model.generate_content([prompt, image])
     print("Raw response:", response.text)

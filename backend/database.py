@@ -165,59 +165,55 @@ def verify_user(email: str, password: str) -> Optional[int]:
 
 def create_session(user_id: int) -> str:
     """Create a new session for a user. Returns session token"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    
-    token = secrets.token_urlsafe(32)
-    expires_at = datetime.now() + timedelta(days=7)
-    
-    cursor.execute(
-        "INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)",
-        (user_id, token, expires_at)
-    )
-    
-    conn.commit()
-    conn.close()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now() + timedelta(days=7)
+        
+        cursor.execute(
+            "INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)",
+            (user_id, token, expires_at)
+        )
+        
+        conn.commit()
     
     return token
 
 def verify_session(token: str) -> Optional[int]:
     """Verify a session token. Returns user_id if valid, None otherwise"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    
-    cursor.execute(
-        "SELECT user_id FROM sessions WHERE token = ? AND expires_at > ?",
-        (token, datetime.now())
-    )
-    
-    result = cursor.fetchone()
-    conn.close()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            "SELECT user_id FROM sessions WHERE token = ? AND expires_at > ?",
+            (token, datetime.now())
+        )
+        
+        result = cursor.fetchone()
     
     return result[0] if result else None
 
 def delete_session(token: str) -> bool:
     """Delete a session token. Returns True if successful"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    
-    cursor.execute("DELETE FROM sessions WHERE token = ?", (token,))
-    
-    success = cursor.rowcount > 0
-    conn.commit()
-    conn.close()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute("DELETE FROM sessions WHERE token = ?", (token,))
+        
+        success = cursor.rowcount > 0
+        conn.commit()
     
     return success
 
 def get_user_email(user_id: int) -> Optional[str]:
     """Get user email by user_id"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT email FROM users WHERE id = ?", (user_id,))
-    
-    result = cursor.fetchone()
-    conn.close()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT email FROM users WHERE id = ?", (user_id,))
+        
+        result = cursor.fetchone()
     
     return result[0] if result else None
 
@@ -406,7 +402,7 @@ def create_problem(statement: str) -> int:
         return cursor.lastrowid
 
 def update_problem_cfg(problem_id: int, bottom_line_cfg: dict, time_complexity: str, space_complexity: str, category: str = None):
-    """Update problem with bottom-line CFG"""
+    """Update problem with base-level CFG"""
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(

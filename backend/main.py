@@ -1,5 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import Optional
@@ -22,6 +23,7 @@ from analyzers.problem_analyzer import analyze_problem
 from analyzers.cfg_comparator import compare_cfgs
 from analyzers.cfg_visualizer import cfg_to_mermaid
 from analyzers.cfg_canonicalizer import canonicalize_cfg, calculate_cfg_similarity
+from analyzers.solution_validator import validate_solution_relevance
 
 app = FastAPI()
 
@@ -70,7 +72,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> int:
         raise HTTPException(status_code=401, detail="Invalid authorization format")
     
     token = authorization.replace("Bearer ", "")
-    user_id = verify_session(token)
+    user_id = await run_in_threadpool(verify_session, token)
     
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
@@ -79,7 +81,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> int:
 
 @app.post("/api/auth/signup")
 async def signup(request: SignupRequest):
-    success, message = create_user(request.email, request.password)
+    success, message = await run_in_threadpool(create_user, request.email, request.password)
     
     if not success:
         raise HTTPException(status_code=400, detail=message)
@@ -88,13 +90,13 @@ async def signup(request: SignupRequest):
 
 @app.post("/api/auth/login")
 async def login(request: LoginRequest):
-    user_id = verify_user(request.email, request.password)
+    user_id = await run_in_threadpool(verify_user, request.email, request.password)
     
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    token = create_session(user_id)
-    email = get_user_email(user_id)
+    token = await run_in_threadpool(create_session, user_id)
+    email = await run_in_threadpool(get_user_email, user_id)
     
     return {"token": token, "email": email}
 
@@ -104,7 +106,7 @@ async def logout(authorization: Optional[str] = Header(None)):
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     token = authorization.replace("Bearer ", "")
-    success = delete_session(token)
+    success = await run_in_threadpool(delete_session, token)
     
     if not success:
         raise HTTPException(status_code=400, detail="Failed to logout")
@@ -113,7 +115,7 @@ async def logout(authorization: Optional[str] = Header(None)):
 
 @app.get("/api/auth/me")
 async def get_me(user_id: int = Depends(get_current_user)):
-    email = get_user_email(user_id)
+    email = await run_in_threadpool(get_user_email, user_id)
     return {"email": email, "user_id": user_id}
 
 @app.post("/api/evaluate-flowchart")
@@ -125,7 +127,7 @@ async def api_evaluate_flowchart(request: FlowchartRequest, user_id: int = Depen
         result = await evaluate_flowchart(request.image)
         print("Evaluation successful!")
         # Save evaluation to database
-        save_evaluation(user_id, 'flowchart', 'image_data', result)
+        await run_in_threadpool(save_evaluation, user_id, 'flowchart', 'image_data', result)
         return result
     except Exception as e:
         print(f"\n!!! ERROR in flowchart evaluation: {str(e)}")
@@ -142,7 +144,7 @@ async def api_evaluate_pseudocode(request: PseudocodeRequest, user_id: int = Dep
         result = await evaluate_pseudocode(request.code)
         print("Evaluation successful!")
         # Save evaluation to database
-        save_evaluation(user_id, 'pseudocode', request.code[:500], result)
+        await run_in_threadpool(save_evaluation, user_id, 'pseudocode', request.code[:500], result)
         return result
     except Exception as e:
         print(f"\n!!! ERROR in pseudocode evaluation: {str(e)}")
@@ -176,7 +178,7 @@ async def api_evaluate_document(request: DocumentRequest, user_id: int = Depends
         print("Evaluation successful!")
         
         # Save evaluation to database
-        save_evaluation(user_id, 'document', extracted_text[:500], result)
+        await run_in_threadpool(save_evaluation, user_id, 'document', extracted_text[:500], result)
         
         return result
     except HTTPException:
@@ -191,7 +193,7 @@ async def api_evaluate_document(request: DocumentRequest, user_id: int = Depends
 async def api_get_evaluations(user_id: int = Depends(get_current_user)):
     """Get user's evaluation history"""
     try:
-        evaluations = get_user_evaluations(user_id)
+        evaluations = await run_in_threadpool(get_user_evaluations, user_id)
         return evaluations
     except Exception as e:
         print(f"Error fetching evaluations: {str(e)}")
@@ -202,13 +204,13 @@ async def api_export_pdf(evaluation_id: int, user_id: int = Depends(get_current_
     """Export a single evaluation as PDF report"""
     try:
         # Get the specific evaluation
-        evaluations = get_user_evaluations(user_id, limit=1000)
+        evaluations = await run_in_threadpool(get_user_evaluations, user_id, limit=1000)
         evaluation = next((e for e in evaluations if e['id'] == evaluation_id), None)
         
         if not evaluation:
             raise HTTPException(status_code=404, detail="Evaluation not found")
         
-        user_email = get_user_email(user_id)
+        user_email = await run_in_threadpool(get_user_email, user_id)
         
         # Generate PDF
         pdf_bytes = generate_pdf_report(evaluation['result'], user_email)
@@ -232,7 +234,7 @@ async def api_export_pdf(evaluation_id: int, user_id: int = Depends(get_current_
 async def api_export_csv(user_id: int = Depends(get_current_user)):
     """Export all evaluations as CSV"""
     try:
-        evaluations = get_user_evaluations(user_id, limit=1000)
+        evaluations = await run_in_threadpool(get_user_evaluations, user_id, limit=1000)
         
         # Prepare data for CSV
         csv_data = []
@@ -305,7 +307,8 @@ async def api_compare_solutions(request: ComparisonRequest, user_id: int = Depen
             'solution2': comparison_result['solution2_score']
         }
         
-        comparison_id = save_comparison(
+        comparison_id = await run_in_threadpool(
+            save_comparison,
             user_id=user_id,
             problem_statement=request.problem_statement,
             solution1_type=request.solution1.type,
@@ -346,7 +349,7 @@ async def api_compare_solutions(request: ComparisonRequest, user_id: int = Depen
 async def api_get_comparisons(user_id: int = Depends(get_current_user)):
     """Get user's comparison history"""
     try:
-        comparisons = get_user_comparisons(user_id)
+        comparisons = await run_in_threadpool(get_user_comparisons, user_id)
         return comparisons
     except Exception as e:
         print(f"Error fetching comparisons: {str(e)}")
@@ -356,12 +359,12 @@ async def api_get_comparisons(user_id: int = Depends(get_current_user)):
 async def api_export_comparison(comparison_id: int, user_id: int = Depends(get_current_user)):
     """Export comparison as PDF"""
     try:
-        comparison = get_comparison_by_id(comparison_id, user_id)
+        comparison = await run_in_threadpool(get_comparison_by_id, comparison_id, user_id)
         
         if not comparison:
             raise HTTPException(status_code=404, detail="Comparison not found")
         
-        user_email = get_user_email(user_id)
+        user_email = await run_in_threadpool(get_user_email, user_id)
         
         # Generate PDF
         pdf_bytes = generate_comparison_pdf_report(comparison, user_email)
@@ -404,10 +407,10 @@ class EvaluateSolutionRequest(BaseModel):
 async def api_upload_problem(request: ProblemUploadRequest, user_id: int = Depends(get_current_user)):
     """Upload or find existing problem"""
     try:
-        similar = find_similar_problem(request.problem_statement)
+        similar = await run_in_threadpool(find_similar_problem, request.problem_statement)
         
         if similar:
-            reference = get_reference_solution(similar['id'])
+            reference = await run_in_threadpool(get_reference_solution, similar['id'])
             return {
                 "status": "found",
                 "problem_id": similar['id'],
@@ -417,7 +420,7 @@ async def api_upload_problem(request: ProblemUploadRequest, user_id: int = Depen
                 "similarity_score": similar['similarity_score']
             }
         
-        problem_id = create_problem(request.problem_statement)
+        problem_id = await run_in_threadpool(create_problem, request.problem_statement)
         return {
             "status": "new_problem",
             "problem_id": problem_id,
@@ -435,11 +438,11 @@ async def api_upload_problem(request: ProblemUploadRequest, user_id: int = Depen
 async def api_fetch_reference(problem_id: int, user_id: int = Depends(get_current_user)):
     """Fetch reference solution for a problem"""
     try:
-        problem = get_problem_by_id(problem_id)
+        problem = await run_in_threadpool(get_problem_by_id, problem_id)
         if not problem:
             raise HTTPException(status_code=404, detail="Problem not found")
         
-        reference = get_reference_solution(problem_id)
+        reference = await run_in_threadpool(get_reference_solution, problem_id)
         
         if not reference:
             return {"exists": False}
@@ -466,9 +469,9 @@ async def api_fetch_reference(problem_id: int, user_id: int = Depends(get_curren
 
 @app.post("/api/upload-reference-solution")
 async def api_upload_reference(request: ReferenceSolutionRequest, user_id: int = Depends(get_current_user)):
-    """Upload reference solution and generate bottom-line CFG"""
+    """Upload reference solution and generate base-level CFG"""
     try:
-        problem = get_problem_by_id(request.problem_id)
+        problem = await run_in_threadpool(get_problem_by_id, request.problem_id)
         if not problem:
             raise HTTPException(status_code=404, detail="Problem not found")
         
@@ -478,22 +481,22 @@ async def api_upload_reference(request: ReferenceSolutionRequest, user_id: int =
         else:
             cfg = await pseudocode_to_cfg(request.solution_content)
         
-        # Canonicalize to bottom-line CFG
+        # Canonicalize to base-level CFG
         bottom_line_cfg = await canonicalize_cfg(cfg, problem['problem_statement'])
         
         # Extract complexity from canonicalized CFG
         time_complexity = bottom_line_cfg.get('time_complexity', 'O(n)')
         space_complexity = bottom_line_cfg.get('space_complexity', 'O(1)')
         
-        # Update problem with bottom-line CFG
-        update_problem_cfg(request.problem_id, bottom_line_cfg, time_complexity, space_complexity)
+        # Update problem with base-level CFG
+        await run_in_threadpool(update_problem_cfg, request.problem_id, bottom_line_cfg, time_complexity, space_complexity)
         
         # Save reference solution
         cfg_dict = cfg_to_dict(cfg)
-        save_solution(request.problem_id, request.solution_type, request.solution_content, 
+        await run_in_threadpool(save_solution, request.problem_id, request.solution_type, request.solution_content, 
                      cfg_dict, is_reference=True, user_id=user_id)
         
-        mermaid = cfg_to_mermaid(bottom_line_cfg, "Bottom-Line CFG")
+        mermaid = cfg_to_mermaid(bottom_line_cfg, "Base-Level CFG")
         
         return {
             "success": True,
@@ -514,9 +517,9 @@ async def api_upload_reference(request: ReferenceSolutionRequest, user_id: int =
 
 @app.post("/api/evaluate-solution")
 async def api_evaluate_solution(request: EvaluateSolutionRequest, user_id: int = Depends(get_current_user)):
-    """Evaluate user solution against bottom-line CFG"""
+    """Evaluate user solution against base-level CFG"""
     try:
-        problem = get_problem_by_id(request.problem_id)
+        problem = await run_in_threadpool(get_problem_by_id, request.problem_id)
         if not problem or not problem['bottom_line_cfg']:
             raise HTTPException(status_code=400, detail="No reference solution available for this problem")
         
@@ -528,8 +531,43 @@ async def api_evaluate_solution(request: EvaluateSolutionRequest, user_id: int =
         
         user_cfg_dict = cfg_to_dict(user_cfg)
         
-        # Compare with bottom-line CFG
-        evaluation = await calculate_cfg_similarity(user_cfg_dict, problem['bottom_line_cfg'])
+        # Validate solution relevance first
+        validation = await validate_solution_relevance(user_cfg_dict, problem['problem_statement'])
+        
+        # If solution is not relevant, return immediate failure
+        if not validation['is_relevant'] and validation['confidence'] > 0.7:
+            evaluation = {
+                "total_score": 0,
+                "breakdown": {
+                    "structural_similarity": {
+                        "score": 0,
+                        "feedback": f"❌ CRITICAL: Your solution implements {validation['detected_algorithm']} but the problem requires {validation['expected_algorithm']}. Please submit a solution that addresses the actual problem statement."
+                    },
+                    "control_flow_coverage": {
+                        "score": 0,
+                        "feedback": "Solution does not address the problem requirements."
+                    },
+                    "correctness": {
+                        "score": 0,
+                        "feedback": "Solution solves a different problem."
+                    },
+                    "efficiency": {
+                        "score": 0,
+                        "feedback": "Not applicable - wrong problem."
+                    }
+                },
+                "differences": [f"Solution mismatch: {validation['reasoning']}"],
+                "missing_paths": ["Entire solution logic is incorrect for this problem"],
+                "extra_paths": [],
+                "recommendations": [
+                    f"Read the problem statement carefully - it asks for {validation['expected_algorithm']}",
+                    f"Your current solution implements {validation['detected_algorithm']}",
+                    "Start over with a solution that addresses the actual problem"
+                ]
+            }
+        else:
+            # Compare with base-level CFG
+            evaluation = await calculate_cfg_similarity(user_cfg_dict, problem['bottom_line_cfg'], problem['problem_statement'])
         
         # Save user solution
         with get_db_connection() as conn:

@@ -21,10 +21,7 @@ export default function ReferenceSelector({ problemId, onReferenceLoaded }: Refe
     if (referenceData?.mermaid_diagram) {
       const renderMermaid = async () => {
         const mermaid = (await import('mermaid')).default;
-        mermaid.initialize({ startOnLoad: false, theme: 'dark' });
-        
-        const elements = document.querySelectorAll('.mermaid');
-        elements.forEach(el => el.removeAttribute('data-processed'));
+        mermaid.initialize({ startOnLoad: false, theme: 'default' });
         
         setTimeout(() => {
           mermaid.run().catch(err => console.error('Mermaid error:', err));
@@ -35,8 +32,10 @@ export default function ReferenceSelector({ problemId, onReferenceLoaded }: Refe
   }, [referenceData]);
 
   useEffect(() => {
-    setReferenceData(null);
-    setShowUploadForm(false);
+    if (problemId) {
+      setReferenceData(null);
+      setShowUploadForm(false);
+    }
   }, [problemId]);
   const [uploadMode, setUploadMode] = useState<'flowchart' | 'pseudocode'>('pseudocode');
   const [pseudocode, setPseudocode] = useState('');
@@ -178,7 +177,7 @@ export default function ReferenceSelector({ problemId, onReferenceLoaded }: Refe
             )}
 
             {referenceData.mermaid_diagram && (
-              <div className="p-4 bg-white dark:bg-gray-900 rounded-lg overflow-auto">
+              <div className="p-4 bg-card rounded-lg overflow-auto border">
                 <div className="mermaid">{referenceData.mermaid_diagram}</div>
               </div>
             )}
