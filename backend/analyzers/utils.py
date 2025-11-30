@@ -41,28 +41,45 @@ def compare_complexity(c1: str, c2: str) -> int:
         "o(sqrt(n))": 3,
         "o(n)": 4,
         "o(nlogn)": 5,
-        "o(n^2)": 6,
-        "o(n^2logn)": 7,
-        "o(n^3)": 8,
-        "o(2^n)": 9,
-        "o(n!)": 10
+        "o(nsqrt(n))": 6,
+        "o(n^2)": 7,
+        "o(n^2logn)": 8,
+        "o(n^3)": 9,
+        "o(2^n)": 10,
+        "o(n!)": 11
     }
     
     # Helper to get rank with fallback
     def get_rank(c):
         if c in ranks:
             return ranks[c]
-        # Try to handle variations like O(N) vs O(n) or O(M+N)
-        # Simple heuristic: length of string often correlates with complexity for simple cases
-        # but let's try to map common ones
-        if "log" in c and "n" in c and "^" not in c:
-            return 2 if c.count("n") == 1 else 5 # O(logn) vs O(nlogn) approx
-        if "^2" in c: return 6
-        if "^3" in c: return 8
-        if "2^" in c: return 9
-        if "!" in c: return 10
+        
+        # Handle K/M as N for approximation
+        c_norm = c.replace('k', 'n').replace('m', 'n')
+        if c_norm in ranks:
+            return ranks[c_norm]
+            
+        # Heuristics
+        
+        # Check for N * sqrt(N)
+        if "n" in c and "sqrt" in c:
+            return 6
+            
+        if "log" in c:
+            # Check if it's N * log... or just log...
+            parts = c.split('log')
+            if len(parts) > 0 and 'n' in parts[0]:
+                return 5 # O(nlogn)
+            return 2 # O(logn)
+            
+        if "^2" in c: return 7
+        if "^3" in c: return 9
+        if "2^" in c: return 10
+        if "!" in c: return 11
         if "n" in c: return 4
-        return 11 # Unknown/High complexity
+        if "sqrt" in c: return 3
+        
+        return 12 # Unknown/High complexity
         
     r1 = get_rank(c1)
     r2 = get_rank(c2)

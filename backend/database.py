@@ -13,7 +13,7 @@ DB_FILE = "users.db"
 @contextmanager
 def get_db_connection():
     """Context manager for database connections"""
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=30.0)
     try:
         yield conn
     except Exception:
@@ -24,6 +24,13 @@ def get_db_connection():
 
 def init_database():
     """Initialize the SQLite database with users, sessions, evaluations, and comparisons tables"""
+    # Enable WAL mode for better concurrency
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.execute("PRAGMA journal_mode=WAL;")
+    except Exception:
+        pass
+
     with get_db_connection() as conn:
         cursor = conn.cursor()
         
