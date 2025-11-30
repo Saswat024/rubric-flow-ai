@@ -595,9 +595,13 @@ async def api_evaluate_solution(request: EvaluateSolutionRequest, user_id: int =
                     evaluation_score=evaluation["total_score"], evaluation_result=evaluation
                 )
 
+        # Fetch actual reference solution for visualization
+        reference_sol = await run_in_threadpool(get_reference_solution, request.problem_id)
+        reference_cfg_for_viz = reference_sol['cfg_json'] if reference_sol else problem['bottom_line_cfg']
+
         # Generate visualizations
         user_mermaid = cfg_to_mermaid(user_cfg_dict, "Your Solution")
-        reference_mermaid = cfg_to_mermaid(problem['bottom_line_cfg'], "Reference Solution")
+        reference_mermaid = cfg_to_mermaid(reference_cfg_for_viz, "Reference Solution")
         
         return {
             "evaluation_id": solution_id,
