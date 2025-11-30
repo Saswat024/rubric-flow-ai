@@ -393,6 +393,10 @@ def create_problem(statement: str) -> int:
     """Create new problem entry"""
     with get_db_connection() as conn:
         cursor = conn.cursor()
+        
+        # Reset sequence to current max id to ensure no gaps at the end
+        cursor.execute("UPDATE sqlite_sequence SET seq = (SELECT COALESCE(MAX(id), 0) FROM problems) WHERE name = 'problems'")
+        
         problem_hash = hash_problem(statement)
         cursor.execute(
             "INSERT INTO problems (problem_statement, problem_hash) VALUES (?, ?)",
@@ -482,6 +486,35 @@ def get_problem_solutions(problem_id: int, limit: int = 50):
             'is_reference': bool(r[3]), 'created_at': r[4]
         } for r in results]
 
+
+def search_problems(query: str, limit: int = 10):
+    """Search for problems by statement or category"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        search_term = f"%{query}%"
+        cursor.execute("""
+            SELECT p.id, p.problem_statement, p.problem_category, p.created_at,
+                   COUNT(s.id) as solution_count,
+                   AVG(s.evaluation_score) as avg_score
+            FROM problems p
+            LEFT JOIN solutions s ON p.id = s.problem_id
+            WHERE p.problem_statement LIKE ? OR p.problem_category LIKE ?
+            GROUP BY p.id
+            ORDER BY 
+                CASE WHEN p.problem_statement LIKE ? THEN 1 ELSE 2 END,
+                p.created_at DESC
+            LIMIT ?
+        """, (search_term, search_term, f"{query}%", limit))
+        results = cursor.fetchall()
+        
+        return [{
+            'id': r[0],
+            'problem_statement': r[1][:200] + '...' if len(r[1]) > 200 else r[1],
+            'category': r[2],
+            'created_at': r[3],
+            'solution_count': r[4] or 0,
+            'avg_score': round(r[5], 1) if r[5] else None
+        } for r in results]
 
 # Initialize database on module import
 init_database()

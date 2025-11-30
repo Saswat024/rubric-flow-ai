@@ -16,7 +16,8 @@ from database import (
     delete_session, get_user_email, save_evaluation, get_user_evaluations,
     save_comparison, get_user_comparisons, get_comparison_by_id,
     find_similar_problem, create_problem, update_problem_cfg, get_problem_by_id,
-    save_solution, get_reference_solution, get_problem_solutions, get_db_connection
+    save_solution, get_reference_solution, get_problem_solutions, get_db_connection,
+    search_problems
 )
 from analyzers.cfg_generator import pseudocode_to_cfg, flowchart_to_cfg, cfg_to_dict
 from analyzers.problem_analyzer import analyze_problem
@@ -496,7 +497,8 @@ async def api_upload_reference(request: ReferenceSolutionRequest, user_id: int =
         await run_in_threadpool(save_solution, request.problem_id, request.solution_type, request.solution_content, 
                      cfg_dict, is_reference=True, user_id=user_id)
         
-        mermaid = cfg_to_mermaid(bottom_line_cfg, "Base-Level CFG")
+        # Generate mermaid from the specific solution CFG, not the bottom-line CFG
+        mermaid = cfg_to_mermaid(cfg_dict, "Reference Solution")
         
         return {
             "success": True,
@@ -624,9 +626,12 @@ async def api_evaluate_solution(request: EvaluateSolutionRequest, user_id: int =
 
 
 @app.get("/api/problems")
-async def api_get_problems(user_id: int = Depends(get_current_user)):
-    """Get all problems with statistics"""
+async def api_get_problems(search: Optional[str] = None, user_id: int = Depends(get_current_user)):
+    """Get all problems with statistics, optionally filtered by search query"""
     try:
+        if search:
+            return await run_in_threadpool(search_problems, search)
+            
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""

@@ -1,5 +1,5 @@
 import google.generativeai as genai
-import base64
+import base64, json
 from PIL import Image
 from io import BytesIO
 from dataclasses import dataclass, asdict

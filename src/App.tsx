@@ -21,9 +21,9 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<ProblemSolver />} />
               <Route path="/auth" element={<Auth />} />
-              <Route path="/problem-solver" element={<ProblemSolver />} />
+              <Route path="/comparator" element={<Index />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
