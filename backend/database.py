@@ -452,6 +452,16 @@ def save_solution(problem_id: int, solution_type: str, solution_content: str, cf
         conn.commit()
         return cursor.lastrowid
 
+def demote_reference_solutions(problem_id: int):
+    """Demote all reference solutions for a problem to regular solutions"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE solutions SET is_reference_solution = 0 WHERE problem_id = ? AND is_reference_solution = 1",
+            (problem_id,)
+        )
+        conn.commit()
+
 def get_reference_solution(problem_id: int):
     """Get reference solution for a problem"""
     with get_db_connection() as conn:

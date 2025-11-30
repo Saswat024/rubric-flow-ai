@@ -568,32 +568,96 @@ async def api_evaluate_solution(request: EvaluateSolutionRequest, user_id: int =
                 ]
             }
         else:
-            # Compare with base-level CFG
-            evaluation = await calculate_cfg_similarity(user_cfg_dict, problem['bottom_line_cfg'], problem['problem_statement'])
+            # Canonicalize user solution to check complexity
+            from analyzers.cfg_canonicalizer import canonicalize_cfg
+            from analyzers.utils import compare_complexity
+            from database import demote_reference_solutions, update_problem_cfg
+            
+            user_canonical_cfg = await canonicalize_cfg(user_cfg, problem['problem_statement'])
+            user_time_complexity = user_canonical_cfg.get('time_complexity', 'O(n)')
+            user_space_complexity = user_canonical_cfg.get('space_complexity', 'O(1)')
+            
+            current_optimal_time = problem.get('optimal_time_complexity', 'O(n)')
+            
+            # Check if user solution is better
+            complexity_comparison = compare_complexity(user_time_complexity, current_optimal_time)
+            
+            is_new_reference = False
+            
+            if complexity_comparison < 0:
+                print(f"Found better solution! New: {user_time_complexity}, Old: {current_optimal_time}")
+                # Demote old reference
+                await run_in_threadpool(demote_reference_solutions, request.problem_id)
+                
+                # Update problem with new optimal CFG
+                await run_in_threadpool(
+                    update_problem_cfg, 
+                    request.problem_id, 
+                    user_canonical_cfg, 
+                    user_time_complexity, 
+                    user_space_complexity
+                )
+                
+                # Update local problem variable for current evaluation
+                problem['bottom_line_cfg'] = user_canonical_cfg
+                is_new_reference = True
+                
+                # Force perfect score for the new reference
+                evaluation = {
+                    "total_score": 100,
+                    "breakdown": {
+                        "structural_similarity": {"score": 40, "feedback": "This is now the reference solution."},
+                        "control_flow_coverage": {"score": 30, "feedback": "Perfect coverage."},
+                        "correctness": {"score": 20, "feedback": "Correct and optimal."},
+                        "efficiency": {"score": 10, "feedback": f"New optimal complexity: {user_time_complexity}"}
+                    },
+                    "differences": [],
+                    "missing_paths": [],
+                    "extra_paths": [],
+                    "recommendations": ["Great job! You found a more optimal solution."]
+                }
+            else:
+                # Compare with base-level CFG
+                evaluation = await calculate_cfg_similarity(user_cfg_dict, problem['bottom_line_cfg'], problem['problem_statement'])
         
-        # Save user solution
+        # Check for existing solution first to avoid nested transactions/locking
+        existing_solution = None
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT id, evaluation_score FROM solutions WHERE problem_id = ? AND user_id = ? AND is_reference_solution = 0",
                 (request.problem_id, user_id)
             )
-            existing = cursor.fetchone()
-            if existing and existing[1] and existing[1] >= evaluation["total_score"]:
-                solution_id = existing[0]
-            elif existing:
+            existing_solution = cursor.fetchone()
+            
+        # If it's a new reference, we force save it as a new entry or update existing to be reference
+        if is_new_reference:
+            # If we have an existing solution, we might want to update it to be the reference instead of creating a new one
+            # But for simplicity and history, let's just save a new one as reference for now, 
+            # or update the existing one if we want to replace the user's previous attempt.
+            # Let's just save a new one to be safe and explicit.
+            solution_id = await run_in_threadpool(
+                save_solution,
+                request.problem_id, request.solution_type, request.solution_content,
+                user_cfg_dict, True, user_id, 100, evaluation
+            )
+        elif existing_solution and existing_solution[1] and existing_solution[1] >= evaluation["total_score"]:
+            solution_id = existing_solution[0]
+        elif existing_solution:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
                 cursor.execute(
                     "UPDATE solutions SET solution_content = ?, cfg_json = ?, evaluation_score = ?, evaluation_result = ? WHERE id = ?",
-                    (request.solution_content[:5000], json.dumps(user_cfg_dict), evaluation["total_score"], json.dumps(evaluation), existing[0])
+                    (request.solution_content[:5000], json.dumps(user_cfg_dict), evaluation["total_score"], json.dumps(evaluation), existing_solution[0])
                 )
                 conn.commit()
-                solution_id = existing[0]
-            else:
-                solution_id = save_solution(
-                    request.problem_id, request.solution_type, request.solution_content,
-                    user_cfg_dict, is_reference=False, user_id=user_id,
-                    evaluation_score=evaluation["total_score"], evaluation_result=evaluation
-                )
+            solution_id = existing_solution[0]
+        else:
+            solution_id = await run_in_threadpool(
+                save_solution,
+                request.problem_id, request.solution_type, request.solution_content,
+                user_cfg_dict, False, user_id, evaluation["total_score"], evaluation
+            )
 
         # Fetch actual reference solution for visualization
         reference_sol = await run_in_threadpool(get_reference_solution, request.problem_id)
