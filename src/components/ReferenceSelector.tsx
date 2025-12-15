@@ -22,9 +22,19 @@ export default function ReferenceSelector({
   const [referenceData, setReferenceData] = useState<any>(null);
   const [renderKey, setRenderKey] = useState(0);
   const [showUploadForm, setShowUploadForm] = useState(false);
+  const [uploadMode, setUploadMode] = useState<"flowchart" | "pseudocode">(
+    "pseudocode"
+  );
+  const [pseudocode, setPseudocode] = useState("");
+  const [flowchartImage, setFlowchartImage] = useState("");
+  const [zoomedDiagram, setZoomedDiagram] = useState<{
+    svg: string;
+    code: string;
+  } | null>(null);
+  const [viewMode, setViewMode] = useState<"cfg" | "code">("cfg");
 
   useEffect(() => {
-    if (referenceData?.mermaid_diagram) {
+    if (referenceData?.mermaid_diagram && viewMode === "cfg") {
       const renderMermaid = async () => {
         const mermaid = (await import("mermaid")).default;
         mermaid.initialize({ startOnLoad: false, theme: "default" });
@@ -35,7 +45,7 @@ export default function ReferenceSelector({
       };
       renderMermaid();
     }
-  }, [referenceData]);
+  }, [referenceData, viewMode, renderKey]);
 
   useEffect(() => {
     if (problemId) {
@@ -43,15 +53,6 @@ export default function ReferenceSelector({
       setShowUploadForm(false);
     }
   }, [problemId]);
-  const [uploadMode, setUploadMode] = useState<"flowchart" | "pseudocode">(
-    "pseudocode"
-  );
-  const [pseudocode, setPseudocode] = useState("");
-  const [flowchartImage, setFlowchartImage] = useState("");
-  const [zoomedDiagram, setZoomedDiagram] = useState<{
-    svg: string;
-    code: string;
-  } | null>(null);
 
   const handleAutoFetch = async () => {
     if (!problemId) {
@@ -67,6 +68,7 @@ export default function ReferenceSelector({
       if (data.exists) {
         setReferenceData(data);
         setRenderKey((prev) => prev + 1);
+        setViewMode("cfg"); // Default to CFG view on auto fetch
         onReferenceLoaded(data);
         toast.success("Reference solution loaded");
         setShowUploadForm(false);
@@ -225,9 +227,24 @@ export default function ReferenceSelector({
 
         {referenceData && (
           <div className="space-y-4">
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <Badge variant="default">Reference Available</Badge>
-              <Badge variant="outline">{referenceData.solution_type}</Badge>
+              <Badge
+                variant={viewMode === "cfg" ? "default" : "outline"}
+                className="cursor-pointer hover:bg-primary/80 transition-colors"
+                onClick={() => setViewMode("cfg")}
+              >
+                CFG
+              </Badge>
+              <Badge
+                variant={viewMode === "code" ? "default" : "outline"}
+                className="cursor-pointer hover:bg-primary/80 transition-colors"
+                onClick={() => setViewMode("code")}
+              >
+                {referenceData.solution_type === "flowchart"
+                  ? "Flowchart"
+                  : "Pseudocode"}
+              </Badge>
             </div>
 
             {referenceData.optimal_complexity && (
@@ -242,7 +259,8 @@ export default function ReferenceSelector({
               </div>
             )}
 
-            {referenceData.mermaid_diagram && (
+            {/* CFG View */}
+            {viewMode === "cfg" && referenceData.mermaid_diagram && (
               <div className="space-y-2">
                 <div className="flex justify-end">
                   <Button
@@ -269,6 +287,23 @@ export default function ReferenceSelector({
                     {referenceData.mermaid_diagram}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Code/Flowchart View */}
+            {viewMode === "code" && referenceData.solution_content && (
+              <div className="p-4 bg-card rounded-lg border">
+                {referenceData.solution_type === "flowchart" ? (
+                  <img
+                    src={referenceData.solution_content}
+                    alt="Reference flowchart"
+                    className="max-w-full h-auto mx-auto rounded"
+                  />
+                ) : (
+                  <pre className="text-sm font-mono whitespace-pre-wrap bg-muted p-4 rounded-lg overflow-auto max-h-80">
+                    {referenceData.solution_content}
+                  </pre>
+                )}
               </div>
             )}
           </div>

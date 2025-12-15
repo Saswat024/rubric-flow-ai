@@ -2,6 +2,7 @@ import google.generativeai as genai
 import os
 import json
 from dotenv import load_dotenv
+from analyzers import config
 
 load_dotenv(override=True)
 api_key = os.getenv("GOOGLE_API_KEY")
@@ -12,7 +13,7 @@ genai.configure(api_key=api_key)
 
 async def validate_solution_relevance(user_cfg: dict, problem_statement: str) -> dict:
     """Validate that the user's solution is relevant to the problem statement"""
-    
+
     system_prompt = """You are an expert algorithm analyst. Your task is to determine if a user's solution (represented as a CFG) is attempting to solve the stated problem.
 
 Analyze the CFG node labels, operations, and control flow to identify what algorithm the user implemented.
@@ -44,7 +45,7 @@ CRITICAL:
 """
 
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = genai.GenerativeModel(config.GEMINI_MODEL)
         prompt = f"""{system_prompt}
 
 Problem Statement:
@@ -87,10 +88,11 @@ Determine if the user's solution is relevant to the problem."""
             "detected_algorithm": "unknown",
             "expected_algorithm": "unknown",
             "confidence": 0.0,
-            "reasoning": "Validation error - defaulting to allow evaluation"
+            "reasoning": "Validation error - defaulting to allow evaluation",
         }
     except Exception as e:
         print(f"Error in validate_solution_relevance: {e}")
         import traceback
+
         traceback.print_exc()
         raise
