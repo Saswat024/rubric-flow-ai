@@ -1,4 +1,4 @@
-# Rubric Flow AI
+# RubriX AI
 
 An intelligent evaluation platform for flowcharts, pseudocode, and algorithms using AI-powered assessment with advanced Control Flow Graph (CFG) analysis.
 
