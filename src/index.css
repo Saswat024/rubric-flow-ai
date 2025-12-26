@@ -151,6 +151,16 @@ All colors MUST be HSL.
   stroke-width: 2px;
 }
 
+/* Light edge color for dark mode */
+.dark .mermaid-diagram .edgePath path {
+  stroke: #ffffff !important; /* Light gray for visibility */
+}
+
+/* Edge arrowheads in dark mode */
+.dark .mermaid-diagram .edgePath .arrowheadPath {
+  fill: #ffffff !important;
+}
+
 /* Style edge labels properly */
 .mermaid-diagram .edgeLabel {
   background-color: transparent !important;

@@ -52,7 +52,7 @@ export default function ProblemSolver() {
             </div>
             <p className="text-lg text-muted-foreground">
               Upload problems, store reference solutions, and evaluate student
-              submissions against bottom-line CFGs
+              submissions against optimal CFGs
             </p>
           </div>
           <div className="flex items-center gap-3">

@@ -119,6 +119,11 @@ def cfg_to_mermaid(cfg, title: str = "CFG") -> str:
         )
         mermaid_lines.append("    classDef loop fill:#8b5cf6,stroke:#7c3aed,color:#fff")
 
+        # Add linkStyle for edges - use light color for visibility in dark mode
+        edge_count = len([e for e in edges if e.get("from") and e.get("to")])
+        if edge_count > 0:
+            mermaid_lines.append("linkStyle default stroke:#94a3b8,stroke-width:2px")
+
         # Apply styles to nodes
         for node in nodes:
             node_id = (
@@ -188,7 +193,7 @@ def cfg_to_dot(cfg: CFG) -> str:
         if label:
             dot_lines.append(f'    {edge["from"]} -> {edge["to"]} [label="{label}"];')
         else:
-            dot_lines.append(f'    {edge["from"]} -> {edge["to"]};')
+            dot_lines.append(f"    {edge['from']} -> {edge['to']};")
 
     dot_lines.append("}")
     return "\n".join(dot_lines)
