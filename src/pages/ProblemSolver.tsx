@@ -59,13 +59,9 @@ export default function ProblemSolver() {
             <span className="text-sm text-muted-foreground truncate max-w-[200px]">
               {email}
             </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate("/comparator")}
-            >
-              <GitCompare className="h-4 w-4 mr-2" />
-              Comparator Tool
+            <Button variant="outline" size="sm" onClick={() => navigate("/")}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Home
             </Button>
             <Button variant="outline" size="sm" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />

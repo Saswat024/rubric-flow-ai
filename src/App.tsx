@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import ProblemSolver from "./pages/ProblemSolver";
+import Home from "./pages/Home";
 
 const queryClient = new QueryClient();
 
@@ -21,7 +22,8 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<ProblemSolver />} />
+              <Route path="/" element={<Home />} />
+              <Route path="/problems" element={<ProblemSolver />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/comparator" element={<Index />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
